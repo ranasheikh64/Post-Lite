@@ -1,8 +1,43 @@
 const Collection = require('../models/Collection');
 const Request = require('../models/Request');
+const Workspace = require('../models/Workspace');
+
+// Helper for RBAC
+async function checkWriteAccess(collectionId, userId) {
+  const collection = await Collection.findById(collectionId);
+  if (!collection) return { error: 'Not found', status: 404 };
+  if (!collection.workspace) {
+    if (collection.createdBy.toString() !== userId) return { error: 'Not authorized', status: 403 };
+    return { success: true, collection };
+  }
+  
+  const workspace = await Workspace.findById(collection.workspace);
+  if (!workspace) return { error: 'Workspace not found', status: 404 };
+  
+  const isOwner = workspace.owner.toString() === userId;
+  const member = workspace.members.find(m => m.user.toString() === userId);
+  
+  if (isOwner || (member && (member.role === 'admin' || member.role === 'editor'))) {
+    return { success: true, collection };
+  }
+  
+  return { error: 'Viewers cannot modify collections', status: 403 };
+}
 
 exports.createCollection = async (req, res) => {
   try {
+    const { workspace } = req.body;
+    if (workspace && workspace !== 'null') {
+      const ws = await Workspace.findById(workspace);
+      if (!ws) return res.status(404).json({ message: 'Workspace not found' });
+      
+      const isOwner = ws.owner.toString() === req.user.id;
+      const member = ws.members.find(m => m.user.toString() === req.user.id);
+      if (!isOwner && (!member || member.role === 'viewer')) {
+        return res.status(403).json({ message: 'Not authorized to create collection in this team' });
+      }
+    }
+
     const collection = await Collection.create({ ...req.body, createdBy: req.user.id });
     res.status(201).json(collection);
   } catch (err) {
@@ -12,15 +47,30 @@ exports.createCollection = async (req, res) => {
 
 exports.getCollections = async (req, res) => {
   try {
-    // Fetch all collections for the user
-    const collections = await Collection.find({ createdBy: req.user.id }).lean();
+    const { workspaceId } = req.query;
     
-    // Fetch all requests belonging to these collections
+    let query = {};
+    if (workspaceId && workspaceId !== 'null') {
+      const workspace = await Workspace.findById(workspaceId);
+      if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+      
+      const isOwner = workspace.owner.toString() === req.user.id;
+      const isMember = workspace.members.some(m => m.user.toString() === req.user.id);
+      if (!isOwner && !isMember) {
+        return res.status(403).json({ message: 'Not authorized for this workspace' });
+      }
+      
+      query = { workspace: workspaceId };
+    } else {
+      query = { createdBy: req.user.id, workspace: null };
+    }
+
+    const collections = await Collection.find(query).lean();
+    
     const requests = await Request.find({ 
       collectionId: { $in: collections.map(c => c._id) } 
     }).lean();
 
-    // Group requests by collection and sort them
     const requestsByCollection = {};
     requests.forEach(r => {
       if (!requestsByCollection[r.collectionId]) {
@@ -29,18 +79,16 @@ exports.getCollections = async (req, res) => {
       requestsByCollection[r.collectionId].push(r);
     });
 
-    // Attach sorted requests to collections
     const collectionsWithRequests = collections.map(c => {
       const collectionRequests = requestsByCollection[c._id] || [];
       collectionRequests.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
       return {
         ...c,
         requests: collectionRequests,
-        folders: [] // Initialize folders array
+        folders: []
       };
     });
 
-    // Build hierarchy
     const rootCollections = [];
     const collectionMap = {};
 
@@ -70,7 +118,42 @@ exports.getCollections = async (req, res) => {
 
 exports.updateCollection = async (req, res) => {
   try {
-    const updated = await Collection.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const access = await checkWriteAccess(req.params.id, req.user.id);
+    if (!access.success) return res.status(access.status).json({ message: access.error });
+
+    if (req.body.workspace !== undefined && req.body.workspace !== access.collection.workspace?.toString()) {
+      if (req.body.workspace && req.body.workspace !== 'null') {
+        const ws = await Workspace.findById(req.body.workspace);
+        if (!ws) return res.status(404).json({ message: 'Target workspace not found' });
+        
+        const isOwner = ws.owner.toString() === req.user.id;
+        const member = ws.members.find(m => m.user.toString() === req.user.id);
+        if (!isOwner && (!member || member.role === 'viewer')) {
+          return res.status(403).json({ message: 'Not authorized to transfer to this team' });
+        }
+      }
+      
+      // Update all child folders recursively to the same workspace
+      const getAllChildCollectionIds = async (parentId) => {
+        let ids = [];
+        const children = await Collection.find({ parentFolder: parentId }).lean();
+        for (const child of children) {
+          ids.push(child._id);
+          const nestedIds = await getAllChildCollectionIds(child._id);
+          ids = ids.concat(nestedIds);
+        }
+        return ids;
+      };
+      const childrenIds = await getAllChildCollectionIds(req.params.id);
+      if (childrenIds.length > 0) {
+        await Collection.updateMany({ _id: { $in: childrenIds } }, { workspace: req.body.workspace === 'null' ? null : req.body.workspace });
+      }
+    }
+
+    const updated = await Collection.findByIdAndUpdate(req.params.id, {
+      ...req.body,
+      workspace: req.body.workspace === 'null' ? null : req.body.workspace
+    }, { new: true });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -79,9 +162,11 @@ exports.updateCollection = async (req, res) => {
 
 exports.deleteCollection = async (req, res) => {
   try {
+    const access = await checkWriteAccess(req.params.id, req.user.id);
+    if (!access.success) return res.status(access.status).json({ message: access.error });
+
     const id = req.params.id;
 
-    // Helper function to get all child collection IDs recursively
     const getAllChildCollectionIds = async (parentId) => {
       let ids = [];
       const children = await Collection.find({ parentFolder: parentId }).lean();
@@ -95,10 +180,7 @@ exports.deleteCollection = async (req, res) => {
 
     const allCollectionIds = [id, ...(await getAllChildCollectionIds(id))];
 
-    // Delete all requests belonging to these collections
     await Request.deleteMany({ collectionId: { $in: allCollectionIds } });
-
-    // Delete all collections
     await Collection.deleteMany({ _id: { $in: allCollectionIds } });
 
     res.status(204).send();
@@ -110,15 +192,29 @@ exports.deleteCollection = async (req, res) => {
 exports.importCollection = async (req, res) => {
   try {
     const postmanCollection = req.body;
+    const { workspaceId } = req.query;
+
     if (!postmanCollection || !postmanCollection.info) {
       return res.status(400).json({ message: 'Invalid Postman Collection JSON' });
+    }
+
+    if (workspaceId && workspaceId !== 'null') {
+      const ws = await Workspace.findById(workspaceId);
+      if (!ws) return res.status(404).json({ message: 'Workspace not found' });
+      
+      const isOwner = ws.owner.toString() === req.user.id;
+      const member = ws.members.find(m => m.user.toString() === req.user.id);
+      if (!isOwner && (!member || member.role === 'viewer')) {
+        return res.status(403).json({ message: 'Not authorized to import to this team' });
+      }
     }
 
     const rootCollectionName = postmanCollection.info.name || 'Imported Collection';
     
     const rootCollection = await Collection.create({
       name: rootCollectionName,
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      workspace: (workspaceId && workspaceId !== 'null') ? workspaceId : null
     });
 
     let requestCount = 0;
@@ -135,6 +231,7 @@ exports.importCollection = async (req, res) => {
             name: item.name || 'Folder',
             parentFolder: parentId,
             createdBy: req.user.id,
+            workspace: (workspaceId && workspaceId !== 'null') ? workspaceId : null,
             sortOrder: i
           });
           folderCount++;
@@ -182,7 +279,6 @@ exports.importCollection = async (req, res) => {
           if (item.request.auth) {
             authType = item.request.auth.type || 'inherit';
             if (item.request.auth[authType]) {
-              // Postman stores auth config as an array of {key, value, type} objects
               if (Array.isArray(item.request.auth[authType])) {
                 item.request.auth[authType].forEach(field => {
                   authConfig[field.key] = field.value;

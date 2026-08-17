@@ -5,6 +5,48 @@ import 'dart:developer';
 import 'dart:convert';
 import '../../data/providers/api_service.dart';
 import '../home/workspace_controller.dart';
+import '../../widgets/variable_hover_card.dart';
+import 'package:flutter/material.dart';
+
+class VariableTextEditingController extends TextEditingController {
+  final RequestBuilderController reqController;
+
+  VariableTextEditingController(this.reqController);
+
+  @override
+  TextSpan buildTextSpan({required BuildContext context, TextStyle? style, required bool withComposing}) {
+    final workspaceController = Get.find<WorkspaceController>();
+    final variables = workspaceController.getVariablesForRequest(reqController.currentRequestId.value ?? '');
+    
+    List<TextSpan> spans = [];
+    final regex = RegExp(r'\{\{([^}]+)\}\}');
+    int lastMatchEnd = 0;
+    
+    for (var match in regex.allMatches(text)) {
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(text: text.substring(lastMatchEnd, match.start), style: style));
+      }
+      
+      final varName = match.group(1)!;
+      final isResolved = variables.containsKey(varName);
+      
+      spans.add(TextSpan(
+        text: match.group(0),
+        style: style?.copyWith(
+          color: isResolved ? Colors.orange : Colors.redAccent,
+        ),
+      ));
+      
+      lastMatchEnd = match.end;
+    }
+    
+    if (lastMatchEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastMatchEnd), style: style));
+    }
+    
+    return TextSpan(style: style, children: spans);
+  }
+}
 
 class RequestBuilderController extends GetxController {
   final ApiService _apiService = ApiService();
@@ -13,6 +55,7 @@ class RequestBuilderController extends GetxController {
   var currentPath = 'Workspace > Collection'.obs;
   
   // -- Request State --
+  var requestKind = 'http'.obs;
   var method = 'GET'.obs;
   var url = ''.obs;
   var docs = ''.obs;
@@ -26,8 +69,11 @@ class RequestBuilderController extends GetxController {
   var bodyType = 'none'.obs;
   var bodyFormat = 'json'.obs;
   var body = Rx<dynamic>('');
+  
+  var socketConfig = <String, dynamic>{}.obs;
 
   // -- Original State (for unsaved changes check) --
+  var originalRequestKind = 'http';
   var originalMethod = 'GET';
   var originalUrl = '';
   var originalDocs = '';
@@ -38,11 +84,11 @@ class RequestBuilderController extends GetxController {
   var originalBodyType = 'none';
   var originalBodyFormat = 'json';
   dynamic originalBody = '';
+  var originalSocketConfig = <String, dynamic>{};
 
   var hasUnsavedChanges = false.obs;
   
-  final TextEditingController urlController = TextEditingController();
-  
+  late final TextEditingController urlController = VariableTextEditingController(this);
   var isLoading = false.obs;
   
   // -- Response State --
@@ -76,6 +122,30 @@ class RequestBuilderController extends GetxController {
     ever(bodyType, (_) => _checkUnsavedChanges());
     ever(bodyFormat, (_) => _checkUnsavedChanges());
     ever(body, (_) => _checkUnsavedChanges());
+    ever(socketConfig, (_) => _checkUnsavedChanges());
+  }
+  
+  List<Widget> getVariableTooltipWidgets() {
+    final workspaceController = Get.find<WorkspaceController>();
+    final variables = workspaceController.getVariableDetailsForRequest(currentRequestId.value ?? '');
+    
+    final regex = RegExp(r'\{\{([^}]+)\}\}');
+    final matches = regex.allMatches(urlController.text);
+    
+    if (matches.isEmpty) return [];
+    
+    final Set<String> uniqueVars = {};
+    for (var match in matches) {
+      uniqueVars.add(match.group(1)!);
+    }
+    
+    List<Widget> widgets = [];
+    for (var varName in uniqueVars) {
+      final detail = variables[varName];
+      widgets.add(VariableHoverCard(varName: varName, detail: detail));
+    }
+    
+    return widgets;
   }
 
   void syncUrlToParams() {
@@ -158,7 +228,8 @@ class RequestBuilderController extends GetxController {
                    docs.value != originalDocs ||
                    authType.value != originalAuthType ||
                    bodyType.value != originalBodyType ||
-                   bodyFormat.value != originalBodyFormat;
+                   bodyFormat.value != originalBodyFormat ||
+                   jsonEncode(socketConfig) != jsonEncode(originalSocketConfig);
                    
     if (!changed) {
       changed = jsonEncode(authConfig) != jsonEncode(originalAuthConfig) ||
@@ -176,6 +247,7 @@ class RequestBuilderController extends GetxController {
     currentRequestId.value = request['_id'];
     currentPath.value = path;
     
+    originalRequestKind = request['requestKind'] ?? 'http';
     originalMethod = request['method'] ?? 'GET';
     originalUrl = request['url'] ?? '';
     originalDocs = request['docs'] ?? '';
@@ -186,7 +258,9 @@ class RequestBuilderController extends GetxController {
     originalBodyType = request['bodyType'] ?? 'none';
     originalBodyFormat = request['bodyFormat'] ?? 'json';
     originalBody = request['body'] ?? '';
+    originalSocketConfig = request['socketConfig'] ?? <String, dynamic>{};
     
+    requestKind.value = originalRequestKind;
     method.value = originalMethod;
     url.value = originalUrl;
     urlController.text = originalUrl;
@@ -198,6 +272,7 @@ class RequestBuilderController extends GetxController {
     bodyType.value = originalBodyType;
     bodyFormat.value = originalBodyFormat;
     body.value = originalBody;
+    socketConfig.value = Map<String, dynamic>.from(originalSocketConfig);
     
     hasUnsavedChanges.value = false;
     _isParsingUrl = false;
@@ -232,6 +307,7 @@ class RequestBuilderController extends GetxController {
         'bodyType': bodyType.value,
         'bodyFormat': bodyFormat.value,
         'body': body.value,
+        'socketConfig': socketConfig,
       });
       
       originalUrl = url.value;
@@ -244,6 +320,7 @@ class RequestBuilderController extends GetxController {
       originalBodyType = bodyType.value;
       originalBodyFormat = bodyFormat.value;
       originalBody = body.value;
+      originalSocketConfig = Map<String, dynamic>.from(socketConfig);
       
       hasUnsavedChanges.value = false;
       
@@ -272,19 +349,76 @@ class RequestBuilderController extends GetxController {
     final stopwatch = Stopwatch()..start();
     
     try {
+      final workspaceController = Get.find<WorkspaceController>();
+      final variables = workspaceController.getVariablesForRequest(currentRequestId.value ?? '');
+      
+      String resolveVariables(String input) {
+        if (input.isEmpty) return input;
+        String output = input;
+        variables.forEach((key, value) {
+          output = output.replaceAll('{{$key}}', value);
+        });
+        return output;
+      }
+
+      String stripJsonComments(String jsonString) {
+        bool inString = false;
+        bool inSingleComment = false;
+        bool inMultiComment = false;
+        StringBuffer result = StringBuffer();
+        for (int i = 0; i < jsonString.length; i++) {
+          if (inSingleComment) {
+            if (jsonString[i] == '\n') {
+              inSingleComment = false;
+              result.write('\n');
+            }
+            continue;
+          }
+          if (inMultiComment) {
+            if (jsonString[i] == '*' && i + 1 < jsonString.length && jsonString[i + 1] == '/') {
+              inMultiComment = false;
+              i++; // skip '/'
+            }
+            continue;
+          }
+          if (jsonString[i] == '"' && (i == 0 || jsonString[i - 1] != '\\')) {
+            inString = !inString;
+          }
+          if (!inString && jsonString[i] == '/' && i + 1 < jsonString.length) {
+            if (jsonString[i + 1] == '/') {
+              inSingleComment = true;
+              i++;
+              continue;
+            } else if (jsonString[i + 1] == '*') {
+              inMultiComment = true;
+              i++;
+              continue;
+            }
+          }
+          result.write(jsonString[i]);
+        }
+        return result.toString();
+      }
+      
+      final resolvedUrl = resolveVariables(url.value);
+
       // Build Headers Map
       final requestHeaders = <String, dynamic>{};
       for (final h in headers) {
         if (h['enabled'] == true && h['key']?.toString().isNotEmpty == true) {
-          requestHeaders[h['key']] = h['value'];
+          requestHeaders[resolveVariables(h['key'])] = resolveVariables(h['value'] ?? '');
         }
       }
       
-      // We are not compiling the body yet for sending, but this is a placeholder.
-      // E.g., for raw body:
+      // Build Request Body
       dynamic requestBody;
       if (bodyType.value == 'raw') {
-        requestBody = body.value;
+        String rawText = body.value;
+        if (bodyFormat.value == 'json') {
+          rawText = stripJsonComments(rawText);
+        }
+        requestBody = resolveVariables(rawText);
+
         if (!requestHeaders.containsKey('Content-Type')) {
           if (bodyFormat.value == 'json') requestHeaders['Content-Type'] = 'application/json';
           else if (bodyFormat.value == 'xml') requestHeaders['Content-Type'] = 'application/xml';
@@ -294,7 +428,7 @@ class RequestBuilderController extends GetxController {
       // Note: for form-data or urlencoded, we'd compile the map here.
       
       final response = await dio.request(
-        url.value,
+        resolvedUrl,
         data: requestBody,
         options: Options(
           method: method.value,

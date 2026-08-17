@@ -47,25 +47,69 @@ class ApiService {
       },
     ));
   }
+  // --- Workspaces ---
 
+  Future<List<dynamic>> getWorkspaces() async {
+    final response = await _dio.get('/workspaces');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> createWorkspace(String name) async {
+    final response = await _dio.post('/workspaces', data: {'name': name});
+    return response.data;
+  }
+
+  Future<void> deleteWorkspace(String id) async {
+    await _dio.delete('/workspaces/$id');
+  }
+
+  Future<Map<String, dynamic>> addWorkspaceMember(String workspaceId, String email, String role) async {
+    final response = await _dio.post('/workspaces/$workspaceId/members', data: {'email': email, 'role': role});
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateWorkspaceMemberRole(String workspaceId, String userId, String role) async {
+    final response = await _dio.patch('/workspaces/$workspaceId/members/$userId', data: {'role': role});
+    return response.data;
+  }
+
+  Future<void> removeWorkspaceMember(String workspaceId, String userId) async {
+    await _dio.delete('/workspaces/$workspaceId/members/$userId');
+  }
   // --- Collections ---
   
-  Future<List<dynamic>> getCollections() async {
-    final response = await _dio.get('/collections');
+  Future<List<dynamic>> getCollections({String? workspaceId}) async {
+    final response = await _dio.get('/collections', queryParameters: {
+      if (workspaceId != null) 'workspaceId': workspaceId,
+    });
     return response.data;
   }
 
-  Future<void> importCollection(Map<String, dynamic> json) async {
-    await _dio.post('/collections/import', data: json);
+  Future<void> importCollection(Map<String, dynamic> json, {String? workspaceId}) async {
+    await _dio.post('/collections/import', data: json, queryParameters: {
+      if (workspaceId != null) 'workspaceId': workspaceId,
+    });
   }
 
-  Future<Map<String, dynamic>> createCollection(String name) async {
-    final response = await _dio.post('/collections', data: {'name': name});
+  Future<Map<String, dynamic>> createCollection(String name, {String? workspaceId}) async {
+    final response = await _dio.post('/collections', data: {
+      'name': name,
+      if (workspaceId != null) 'workspace': workspaceId,
+    });
     return response.data;
   }
 
-  Future<Map<String, dynamic>> createFolder(String parentId, String name) async {
-    final response = await _dio.post('/collections', data: {'name': name, 'parentFolder': parentId});
+  Future<Map<String, dynamic>> updateCollection(String id, Map<String, dynamic> data) async {
+    final response = await _dio.patch('/collections/$id', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> createFolder(String parentId, String name, {String? workspaceId}) async {
+    final response = await _dio.post('/collections', data: {
+      'name': name, 
+      'parentFolder': parentId,
+      if (workspaceId != null) 'workspace': workspaceId,
+    });
     return response.data;
   }
 
@@ -75,11 +119,12 @@ class ApiService {
 
   // --- Requests ---
 
-  Future<Map<String, dynamic>> createRequest(String collectionId, String name, String method) async {
+  Future<Map<String, dynamic>> createRequest(String collectionId, String name, String method, {String requestKind = 'http'}) async {
     final response = await _dio.post('/requests', data: {
       'collectionId': collectionId,
       'name': name,
       'method': method,
+      'requestKind': requestKind,
     });
     return response.data;
   }

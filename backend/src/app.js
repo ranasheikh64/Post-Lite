@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', require('./routes/auth.routes'));
-// app.use('/workspaces', require('./routes/workspace.routes'));
+app.use('/workspaces', require('./routes/workspace.routes'));
 app.use('/collections', require('./routes/collection.routes'));
 app.use('/requests', require('./routes/request.routes'));
 // app.use('/environments', require('./routes/environment.routes'));

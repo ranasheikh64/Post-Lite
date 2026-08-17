@@ -19,7 +19,7 @@ const requestSchema = new mongoose.Schema({
   bodyFormat: { type: String, default: 'json' }, // for raw (json, text, javascript, html, xml)
   body: { type: mongoose.Schema.Types.Mixed, default: {} }, // flexible — raw JSON, form fields, etc.
 
-  authType: { type: String, enum: ['inherit', 'none', 'bearer', 'api-key', 'basic', 'jwt', 'oauth1', 'oauth2', 'digest', 'hawk', 'aws', 'ntlm', 'akamai', 'asap'], default: 'inherit' },
+  authType: { type: String, enum: ['inherit', 'none', 'noauth', 'bearer', 'api-key', 'basic', 'jwt', 'oauth1', 'oauth2', 'digest', 'hawk', 'aws', 'ntlm', 'akamai', 'asap'], default: 'inherit' },
   authConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
 
   // For WebSocket / Socket.IO requests

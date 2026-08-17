@@ -2,24 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Premium Dark Color Palette
-  static const Color background = Color(0xFF0D0E15); // Deep dark blue/black
-  static const Color surface = Color(0xFF161822); // Slightly lighter for panels
-  static const Color surfaceHighlight = Color(0xFF202332);
-  static const Color primary = Color(0xFF7C3AED); // Vibrant Purple
-  static const Color primaryLight = Color(0xFF8B5CF6);
-  static const Color secondary = Color(0xFF06B6D4); // Cyan
+  // Standard Dark Color Palette
+  static const Color background = Color(0xFF1E1E1E);
+  static const Color surface = Color(0xFF252526);
+  static const Color surfaceHighlight = Color(0xFF333333);
+  static const Color primary = Color(0xFFFF6C37); // Postman Orange
+  static const Color primaryLight = Color(0xFFFF895D);
+  static const Color secondary = Color(0xFF0EA5E9);
   
-  static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color divider = Color(0xFF2A2D3E);
+  static const Color textPrimary = Color(0xFFE0E0E0);
+  static const Color textSecondary = Color(0xFF9E9E9E);
+  static const Color divider = Color(0xFF383838);
 
   // HTTP Method Colors
-  static const Color getMethod = Color(0xFF10B981); // Emerald
-  static const Color postMethod = Color(0xFFF59E0B); // Amber
-  static const Color putMethod = Color(0xFF3B82F6); // Blue
-  static const Color patchMethod = Color(0xFF8B5CF6); // Purple
-  static const Color deleteMethod = Color(0xFFEF4444); // Red
+  static const Color getMethod = Color(0xFF0CBB52);
+  static const Color postMethod = Color(0xFFFFB400);
+  static const Color putMethod = Color(0xFF097BED);
+  static const Color patchMethod = Color(0xFFF9A825);
+  static const Color deleteMethod = Color(0xFFEB2013);
+
+  static Color getMethodColor(String? method) {
+    switch (method?.toUpperCase()) {
+      case 'GET': return getMethod;
+      case 'POST': return postMethod;
+      case 'PUT': return putMethod;
+      case 'PATCH': return patchMethod;
+      case 'DELETE': return deleteMethod;
+      default: return textSecondary;
+    }
+  }
 
   static ThemeData get darkTheme {
     return ThemeData(
