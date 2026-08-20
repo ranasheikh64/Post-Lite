@@ -6,7 +6,6 @@ import 'dart:convert';
 import '../../data/providers/api_service.dart';
 import '../home/workspace_controller.dart';
 import '../../widgets/variable_hover_card.dart';
-import 'package:flutter/material.dart';
 
 class VariableTextEditingController extends TextEditingController {
   final RequestBuilderController reqController;

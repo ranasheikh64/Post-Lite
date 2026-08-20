@@ -263,6 +263,7 @@ class HomeView extends StatelessWidget {
                       itemCount: members.length,
                       itemBuilder: (context, index) {
                         final member = members[index];
+                        // ignore: unused_local_variable
                         final isMe = false; // We can improve this check
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
