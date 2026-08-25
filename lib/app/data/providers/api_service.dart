@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final Dio _dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:4000'));
+  final Dio _dio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app'));
 
   ApiService() {
     _dio.interceptors.add(InterceptorsWrapper(
@@ -21,7 +21,7 @@ class ApiService {
           
           if (refreshToken != null) {
             try {
-              final refreshDio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:4000/auth'));
+              final refreshDio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app/auth'));
               final refreshResponse = await refreshDio.post('/refresh', data: {
                 'refreshToken': refreshToken,
               });

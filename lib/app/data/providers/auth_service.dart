@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   // Use local machine IP instead of localhost so it works on emulators & physical devices
-  final Dio _dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:4000/auth'));
+  final Dio _dio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app/auth'));
 
   AuthService() {
     _dio.interceptors.add(InterceptorsWrapper(
