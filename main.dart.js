@@ -102575,7 +102575,7 @@ break
 case 1:return A.t(q,r)}})
 return A.u($async$v0,r)}}
 A.aoj.prototype={
-acW(){var s=A.acf(A.aQH("http://127.0.0.1:4000",B.pM,B.pM))
+acW(){var s=A.acf(A.aQH("https://post-lite-backend.vercel.app",B.pM,B.pM))
 this.a=s
 s=s.a28$
 s.C(s,new A.Sa(new A.aok(),new A.aol(),new A.aom(),null,null,null))},
