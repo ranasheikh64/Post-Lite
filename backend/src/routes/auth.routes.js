@@ -11,5 +11,6 @@ router.post('/reset-password', ctrl.resetPassword);
 
 router.get('/me', authMiddleware, ctrl.getMe);
 router.delete('/me', authMiddleware, ctrl.deleteAccount);
+router.get('/users', authMiddleware, ctrl.searchUsers);
 
 module.exports = router;

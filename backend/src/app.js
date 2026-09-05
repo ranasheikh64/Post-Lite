@@ -28,5 +28,6 @@ app.use('/requests', require('./routes/request.routes'));
 // app.use('/environments', require('./routes/environment.routes'));
 // app.use('/history', require('./routes/history.routes'));
 app.use('/sync', require('./routes/sync.routes'));
+app.use('/proxy', require('./routes/proxy.routes'));
 
 module.exports = app;

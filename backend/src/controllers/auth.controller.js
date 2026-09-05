@@ -148,3 +148,24 @@ exports.deleteAccount = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.searchUsers = async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = { _id: { $ne: req.user.id } }; // always exclude self
+
+    if (search && search.trim().length > 0) {
+      const regex = new RegExp(search.trim(), 'i');
+      query.$or = [{ name: regex }, { email: regex }];
+    }
+
+    const users = await User.find(query)
+      .select('name email _id')
+      .sort({ name: 1 })
+      .limit(50)
+      .lean();
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
