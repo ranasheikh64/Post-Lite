@@ -11,8 +11,13 @@ class NetworkCaller {
   String get baseUrl => _dio.options.baseUrl;
 
   NetworkCaller._internal() {
+    const bool isProduction = bool.fromEnvironment('dart.vm.product', defaultValue: false);
+    final String backendUrl = isProduction
+        ? 'https://post-lite-backend.vercel.app'
+        : 'http://127.0.0.1:4000';
+
     _dio = Dio(BaseOptions(
-      baseUrl: 'http://127.0.0.1:4000',
+      baseUrl: backendUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
     ));
