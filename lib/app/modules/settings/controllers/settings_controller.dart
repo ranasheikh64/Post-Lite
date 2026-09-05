@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
-import '../../data/providers/auth_service.dart';
-import '../../routes/app_routes.dart';
+import 'package:postmanclone/app/data/providers/auth_service.dart';
+import 'package:postmanclone/app/routes/app_routes.dart';
+import 'package:postmanclone/app/widgets/custom_snackbar.dart';
+
 
 class SettingsController extends GetxController {
   final AuthService _authService = AuthService();
@@ -24,7 +26,7 @@ class SettingsController extends GetxController {
       }
     } catch (e) {
       currentUser.value = null;
-      Get.snackbar('Error', 'Failed to load profile');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to load profile', isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -43,9 +45,9 @@ class SettingsController extends GetxController {
       await _authService.logout();
       currentUser.value = null;
       Get.offAllNamed(Routes.LOGIN);
-      Get.snackbar('Success', 'Account deleted successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Account deleted successfully');
     } catch (e) {
-      Get.snackbar('Failed', e.toString());
+      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
       isLoading.value = false;
     }

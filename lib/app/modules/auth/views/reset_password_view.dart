@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'auth_controller.dart';
+import 'package:postmanclone/app/widgets/custom_button.dart';
+import 'package:postmanclone/app/widgets/custom_textfield.dart';
+import '../controllers/auth_controller.dart';
 
-class RegisterView extends StatelessWidget {
-  RegisterView({Key? key}) : super(key: key);
 
-  final AuthController controller = Get.put(AuthController());
+class ResetPasswordView extends GetView<AuthController> {
+  ResetPasswordView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Reset Password')),
       body: Center(
         child: Container(
           width: 400,
@@ -30,7 +32,7 @@ class RegisterView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Create Account',
+                'Enter OTP',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -38,42 +40,34 @@ class RegisterView extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 16),
+              const Text(
+                'Please enter the OTP sent to your email and your new password.',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 32),
-              TextField(
-                controller: controller.nameController,
-                decoration: const InputDecoration(
-                  hintText: 'Full Name',
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
+              CustomTextField(
+                controller: controller.otpController,
+                hintText: '6-digit OTP',
+                prefixIcon: const Icon(Icons.security),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: controller.emailController,
-                decoration: const InputDecoration(
-                  hintText: 'Email address',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
+              CustomTextField(
                 controller: controller.passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  hintText: 'Password',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
+                hintText: 'New Password',
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
               const SizedBox(height: 32),
-              Obx(() => ElevatedButton(
-                onPressed: controller.isLoading.value ? null : () => controller.register(),
-                child: controller.isLoading.value 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Sign Up'),
+              Obx(() => CustomButton(
+                text: 'Update Password',
+                isLoading: controller.isLoading.value,
+                onPressed: () => controller.resetPassword(),
               )),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () => Get.back(),
-                child: const Text('Already have an account? Sign in'),
+                child: const Text('Cancel'),
               ),
             ],
           ),

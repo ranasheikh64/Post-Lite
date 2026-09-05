@@ -3,21 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
-import 'request_builder_controller.dart';
-import 'socket_controller.dart';
+import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
+import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
 
-class SocketIOBuilderView extends StatefulWidget {
-  const SocketIOBuilderView({Key? key}) : super(key: key);
+
+class WebSocketBuilderView extends StatefulWidget {
+  const WebSocketBuilderView({Key? key}) : super(key: key);
 
   @override
-  _SocketIOBuilderViewState createState() => _SocketIOBuilderViewState();
+  _WebSocketBuilderViewState createState() => _WebSocketBuilderViewState();
 }
 
-class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
+class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
   final SocketController socketController = Get.put(SocketController());
   final RequestBuilderController reqController = Get.find<RequestBuilderController>();
   final TextEditingController messageController = TextEditingController();
-  final TextEditingController eventController = TextEditingController();
   final RxDouble topHeight = 400.0.obs;
 
   @override
@@ -68,7 +68,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     if (socketController.isConnected.value) {
       socketController.disconnect();
     } else {
-      socketController.connectSocketIO(reqController.url.value, _getHeaders());
+      socketController.connectWebSocket(reqController.url.value, _getHeaders());
     }
   }
 
@@ -84,7 +84,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Obx(() => Text(
-                '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null ? "New Socket.io Request" : reqController.url.value.split("/").last.isEmpty ? "Unnamed Socket.io Request" : reqController.url.value.split("/").last}',
+                '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null ? "New WS Request" : reqController.url.value.split("/").last.isEmpty ? "Unnamed WS Request" : reqController.url.value.split("/").last}',
                 style: const TextStyle(color: Colors.grey, fontSize: 13),
               )),
               Row(
@@ -124,8 +124,8 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12.0),
                         child: Text(
-                          'IO',
-                          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                          'WS',
+                          style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold),
                         ),
                       ),
                       VerticalDivider(color: Colors.grey[800], width: 1, indent: 6, endIndent: 6),
@@ -136,7 +136,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                           decoration: const InputDecoration(
                             hoverColor: Colors.transparent,
                             filled: false,
-                            hintText: 'http:// or https://',
+                            hintText: 'ws:// or wss://',
                             hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -234,7 +234,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                           decoration: const InputDecoration(
                                             hoverColor: Colors.transparent,
                                             filled: false,
-                                            hintText: 'Enter JSON payload...',
+                                            hintText: 'Enter message to send...',
                                             border: InputBorder.none,
                                             isDense: true,
                                           ),
@@ -244,30 +244,11 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.end,
                                         children: [
-                                          SizedBox(
-                                            width: 150,
-                                            child: TextField(
-                                              controller: eventController,
-                                              style: const TextStyle(fontSize: 13),
-                                              decoration: const InputDecoration(
-                                                hoverColor: Colors.transparent,
-                                                filled: false,
-                                                hintText: 'Event name',
-                                                border: OutlineInputBorder(),
-                                                isDense: true,
-                                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
                                           Obx(() => ElevatedButton(
                                             onPressed: socketController.isConnected.value
                                                 ? () {
                                                     if (messageController.text.isNotEmpty) {
-                                                      socketController.sendMessage(
-                                                        messageController.text,
-                                                        eventName: eventController.text,
-                                                      );
+                                                      socketController.sendMessage(messageController.text);
                                                       messageController.clear();
                                                     }
                                                   }
@@ -365,27 +346,12 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                           children: [
                                             Icon(
                                               msg.isSent ? Icons.arrow_upward : Icons.arrow_downward,
-                                              color: msg.isSent ? Colors.orange : Colors.blue,
+                                              color: msg.isSent ? Colors.green : Colors.blue,
                                               size: 16,
                                             ),
                                             const SizedBox(width: 8),
                                             Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  if (msg.eventName != null && msg.eventName!.isNotEmpty)
-                                                    Text(
-                                                      'Event: ${msg.eventName}',
-                                                      style: const TextStyle(
-                                                        color: Colors.orangeAccent,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  const SizedBox(height: 4),
-                                                  _buildMessageContent(msg.content),
-                                                ],
-                                              ),
+                                              child: _buildMessageContent(msg.content),
                                             ),
                                             Text(
                                               timeStr,

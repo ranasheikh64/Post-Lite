@@ -1,25 +1,11 @@
-import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'network_caller.dart';
 
 class AuthService {
-  // Use local machine IP instead of localhost so it works on emulators & physical devices
-  final Dio _dio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app/auth'));
-
-  AuthService() {
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('accessToken');
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        return handler.next(options);
-      },
-    ));
-  }
+  final NetworkCaller _network = NetworkCaller();
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await _dio.post('/login', data: {
+    final response = await _network.postRequest('/auth/login', data: {
       'email': email,
       'password': password,
     });
@@ -32,7 +18,7 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> register(String name, String email, String password) async {
-    final response = await _dio.post('/register', data: {
+    final response = await _network.postRequest('/auth/register', data: {
       'name': name,
       'email': email,
       'password': password,
@@ -41,11 +27,11 @@ class AuthService {
   }
 
   Future<void> forgotPassword(String email) async {
-    await _dio.post('/forgot-password', data: {'email': email});
+    await _network.postRequest('/auth/forgot-password', data: {'email': email});
   }
 
   Future<void> resetPassword(String email, String otp, String newPassword) async {
-    await _dio.post('/reset-password', data: {
+    await _network.postRequest('/auth/reset-password', data: {
       'email': email,
       'otp': otp,
       'newPassword': newPassword,
@@ -53,12 +39,12 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> getMe() async {
-    final response = await _dio.get('/me');
+    final response = await _network.getRequest('/auth/me');
     return response.data;
   }
 
   Future<void> deleteAccount() async {
-    await _dio.delete('/me');
+    await _network.deleteRequest('/auth/me');
   }
 
   Future<void> logout() async {

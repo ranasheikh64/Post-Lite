@@ -1,11 +1,12 @@
 import 'package:get/get.dart';
 import 'package:dio/dio.dart';
+import 'package:postmanclone/app/data/providers/api_service.dart';
 import 'dart:developer';
 import 'dart:convert';
-import '../../data/providers/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:flutter/material.dart';
+import 'package:postmanclone/app/widgets/custom_snackbar.dart';
+import 'package:postmanclone/app/widgets/custom_loader.dart';
 
 class WorkspaceController extends GetxController {
   final ApiService _apiService = ApiService();
@@ -63,10 +64,7 @@ class WorkspaceController extends GetxController {
   Future<void> bulkDeleteSelected() async {
     if (selectedCollectionIds.isEmpty && selectedRequestIds.isEmpty) return;
     
-    Get.dialog(
-      const Center(child: CircularProgressIndicator()),
-      barrierDismissible: false,
-    );
+    CustomLoader.show();
     
     try {
       // Delete requests
@@ -80,22 +78,131 @@ class WorkspaceController extends GetxController {
       
       toggleSelectionMode();
       await fetchCollections();
-      Get.back(); // close loader
-      Get.snackbar('Success', 'Selected items deleted successfully');
+      CustomLoader.hide();
+      CustomSnackbar.show(title: 'Success', message: 'Selected items deleted successfully');
     } catch (e, stack) {
-      Get.back(); // close loader
+      CustomLoader.hide();
       log('Failed to bulk delete', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to delete some items');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to delete some items', isError: true);
     }
   }
 
   Future<void> updateCollectionVariables(String id, List<Map<String, dynamic>> variables) async {
+    dynamic targetCollection;
+    List<dynamic>? oldVariables;
+    
+    bool findNode(List<dynamic> nodes) {
+      for (var node in nodes) {
+        if (node['_id'] == id) {
+          targetCollection = node;
+          if (node['variables'] != null) {
+            oldVariables = List<dynamic>.from(node['variables'].map((v) => Map<String, dynamic>.from(v as Map)));
+          }
+          return true;
+        }
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (findNode(node['folders'])) return true;
+        }
+      }
+      return false;
+    }
+    findNode(collections);
+
+    if (targetCollection != null) {
+      targetCollection['variables'] = variables;
+      collections.refresh();
+    }
+
     try {
       await _apiService.updateCollection(id, {'variables': variables});
-      await fetchCollections();
     } catch (e, stack) {
-      log('Failed to update variables', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to save variables');
+      log('Failed to update variables, rolling back', error: e, stackTrace: stack, name: 'WorkspaceController');
+      if (targetCollection != null && oldVariables != null) {
+        targetCollection['variables'] = oldVariables;
+        collections.refresh();
+      }
+    }
+  }
+
+  void updateRequestLocally(String requestId, Map<String, dynamic> updateData) {
+    bool updateInList(List<dynamic> currentLevel) {
+      for (final node in currentLevel) {
+        if (node['requests'] != null) {
+          for (var i = 0; i < (node['requests'] as List).length; i++) {
+            if (node['requests'][i]['_id'] == requestId) {
+              node['requests'][i] = {
+                ...node['requests'][i],
+                ...updateData,
+              };
+              return true;
+            }
+          }
+        }
+        
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (updateInList(node['folders'])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    if (updateInList(collections)) {
+      collections.refresh();
+    }
+  }
+
+  Future<void> addNewVariable(String requestId, String key, String value) async {
+    List<dynamic> pathToRequest = [];
+    bool findPath(List<dynamic> currentLevel, List<dynamic> path) {
+      for (final node in currentLevel) {
+        path.add(node);
+        
+        if (node['requests'] != null) {
+          for (final req in node['requests']) {
+            if (req['_id'] == requestId) {
+              return true;
+            }
+          }
+        }
+        
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (findPath(node['folders'], path)) {
+            return true;
+          }
+        }
+        
+        path.removeLast();
+      }
+      return false;
+    }
+    
+    if (findPath(collections, pathToRequest) && pathToRequest.isNotEmpty) {
+      final rootCollection = pathToRequest.first;
+      final String collectionId = rootCollection['_id'];
+      List<dynamic> currentVars = rootCollection['variables'] ?? [];
+      
+      List<Map<String, dynamic>> updatedVariables = currentVars.map((v) => Map<String, dynamic>.from(v as Map)).toList();
+      
+      bool exists = false;
+      for (var v in updatedVariables) {
+        if (v['key'] == key) {
+          v['value'] = value;
+          exists = true;
+          break;
+        }
+      }
+      
+      if (!exists) {
+        updatedVariables.add({
+          'key': key,
+          'value': value,
+          'enabled': true,
+        });
+      }
+      
+      await updateCollectionVariables(collectionId, updatedVariables);
     }
   }
 
@@ -191,8 +298,10 @@ class WorkspaceController extends GetxController {
 
   Future<void> updateSingleVariable(VariableDetail detail, String newValue) async {
     final variables = detail.sourceVariables;
+    List<Map<String, dynamic>> updatedVariables = variables.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    
     bool found = false;
-    for (var variable in variables) {
+    for (var variable in updatedVariables) {
       if (variable['key'] == detail.key) {
         variable['value'] = newValue;
         found = true;
@@ -201,7 +310,6 @@ class WorkspaceController extends GetxController {
     }
     
     if (found) {
-      List<Map<String, dynamic>> updatedVariables = List<Map<String, dynamic>>.from(variables);
       await updateCollectionVariables(detail.sourceId, updatedVariables);
     }
   }
@@ -281,9 +389,9 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.createWorkspace(name);
       await fetchWorkspaces();
-      Get.snackbar('Success', 'Team created successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Team created successfully');
     } catch (e) {
-      Get.snackbar('Error', 'Failed to create team');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to create team', isError: true);
     }
   }
 
@@ -292,9 +400,9 @@ class WorkspaceController extends GetxController {
       await _apiService.deleteWorkspace(id);
       if (selectedWorkspaceId.value == id) switchWorkspace(null);
       await fetchWorkspaces();
-      Get.snackbar('Success', 'Team deleted');
+      CustomSnackbar.show(title: 'Success', message: 'Team deleted');
     } catch (e) {
-      Get.snackbar('Error', 'Failed to delete team');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to delete team', isError: true);
     }
   }
 
@@ -302,11 +410,11 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.addWorkspaceMember(workspaceId, email, role);
       await fetchWorkspaces();
-      Get.snackbar('Success', 'Member invited');
+      CustomSnackbar.show(title: 'Success', message: 'Member invited');
     } catch (e, stack) {
       log('Failed to add member', error: e, stackTrace: stack, name: 'WorkspaceController');
       final msg = e is DioException ? e.response?.data['message'] ?? 'Failed to add member' : 'Failed to add member';
-      Get.snackbar('Error', msg);
+      CustomSnackbar.show(title: 'Error', message: msg, isError: true);
     }
   }
 
@@ -315,7 +423,7 @@ class WorkspaceController extends GetxController {
       await _apiService.updateWorkspaceMemberRole(workspaceId, userId, role);
       await fetchWorkspaces();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to update role');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to update role', isError: true);
     }
   }
 
@@ -324,7 +432,7 @@ class WorkspaceController extends GetxController {
       await _apiService.removeWorkspaceMember(workspaceId, userId);
       await fetchWorkspaces();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to remove member');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to remove member', isError: true);
     }
   }
 
@@ -332,9 +440,9 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.updateCollection(collectionId, {'workspace': targetWorkspaceId ?? 'null'});
       await fetchCollections();
-      Get.snackbar('Success', 'Collection transferred successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Collection transferred successfully');
     } catch (e) {
-      Get.snackbar('Error', 'Failed to transfer collection');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to transfer collection', isError: true);
     }
   }
 
@@ -345,27 +453,24 @@ class WorkspaceController extends GetxController {
       collections.value = data;
     } catch (e, stack) {
       log('Failed to fetch collections', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to fetch collections');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to fetch collections', isError: true);
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> importPostmanCollection(String jsonString) async {
-    Get.dialog(
-      const Center(child: CircularProgressIndicator()),
-      barrierDismissible: false,
-    );
+    CustomLoader.show();
     try {
       final parsedJson = jsonDecode(jsonString) as Map<String, dynamic>;
       await _apiService.importCollection(parsedJson, workspaceId: selectedWorkspaceId.value);
       await fetchCollections(); // Refresh the list
-      Get.back(); // close loader
-      Get.snackbar('Success', 'Collection imported successfully!');
+      CustomLoader.hide();
+      CustomSnackbar.show(title: 'Success', message: 'Collection imported successfully!');
     } catch (e, stack) {
-      Get.back(); // close loader
+      CustomLoader.hide();
       log('Failed to import collection', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to import. Invalid JSON or server error.');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to import. Invalid JSON or server error.', isError: true);
     }
   }
 
@@ -375,17 +480,17 @@ class WorkspaceController extends GetxController {
       await fetchCollections(); // Refresh list
     } catch (e, stack) {
       log('Failed to create collection', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to create collection');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to create collection', isError: true);
     }
   }
 
   Future<void> createFolder(String parentId, String name) async {
     try {
-      await _apiService.createFolder(parentId, name, workspaceId: selectedWorkspaceId.value);
+      await _apiService.createFolder(parentId, name);
       await fetchCollections(); // Refresh list
     } catch (e, stack) {
       log('Failed to create folder', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to create folder');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to create folder', isError: true);
     }
   }
 
@@ -393,10 +498,10 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.deleteCollection(id);
       await fetchCollections();
-      Get.snackbar('Success', 'Deleted successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Deleted successfully');
     } catch (e, stack) {
       log('Failed to delete collection', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to delete');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to delete', isError: true);
     }
   }
 
@@ -415,14 +520,14 @@ class WorkspaceController extends GetxController {
       await _apiService.reorderRequests(requestIds);
     } catch (e, stack) {
       log('Failed to reorder requests', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to save new order');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to save new order', isError: true);
       await fetchCollections(); // revert on failure
     }
   }
 
   Future<void> createRequest(String collectionId, String name, String method, String requestKind) async {
     try {
-      await _apiService.createRequest(collectionId, name, method, requestKind: requestKind);
+      await _apiService.createRequest(collectionId, name, method: method, requestKind: requestKind);
       await fetchCollections(); // Refresh list to show new nested request
     } catch (e, stack) {
       log('Failed to create request', error: e, stackTrace: stack, name: 'WorkspaceController');
@@ -431,7 +536,7 @@ class WorkspaceController extends GetxController {
         msg = e.response?.data['message'] ?? msg;
         log('DioResponse: ${e.response?.data}', name: 'WorkspaceController');
       }
-      Get.snackbar('Error', msg);
+      CustomSnackbar.show(title: 'Error', message: msg, isError: true);
     }
   }
 
@@ -439,10 +544,10 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.deleteRequest(id);
       await fetchCollections();
-      Get.snackbar('Success', 'Request deleted');
+      CustomSnackbar.show(title: 'Success', message: 'Request deleted');
     } catch (e, stack) {
       log('Failed to delete request', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to delete request');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to delete request', isError: true);
     }
   }
 
@@ -450,10 +555,10 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.deleteSavedResponse(requestId, responseId);
       await fetchCollections();
-      Get.snackbar('Success', 'Response deleted');
+      CustomSnackbar.show(title: 'Success', message: 'Response deleted');
     } catch (e, stack) {
       log('Failed to delete response', error: e, stackTrace: stack, name: 'WorkspaceController');
-      Get.snackbar('Error', 'Failed to delete response');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to delete response', isError: true);
     }
   }
 
@@ -479,9 +584,9 @@ class WorkspaceController extends GetxController {
   //   }
     
   //   if (hasError) {
-  //     Get.snackbar('Warning', 'Some items failed to delete');
+  //     CustomSnackbar.show(title: 'Warning', message: 'Some items failed to delete');
   //   } else {
-  //     Get.snackbar('Success', 'Selected items deleted');
+  //     CustomSnackbar.show(title: 'Success', message: 'Selected items deleted');
   //   }
     
   //   toggleSelectionMode();

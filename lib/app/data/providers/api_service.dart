@@ -1,98 +1,55 @@
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'network_caller.dart';
 
 class ApiService {
-  final Dio _dio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app'));
+  final NetworkCaller _network = NetworkCaller();
 
-  ApiService() {
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('accessToken');
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        return handler.next(options);
-      },
-      onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
-          final prefs = await SharedPreferences.getInstance();
-          final refreshToken = prefs.getString('refreshToken');
-          
-          if (refreshToken != null) {
-            try {
-              final refreshDio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app/auth'));
-              final refreshResponse = await refreshDio.post('/refresh', data: {
-                'refreshToken': refreshToken,
-              });
-              
-              if (refreshResponse.statusCode == 200) {
-                final newAccessToken = refreshResponse.data['accessToken'];
-                await prefs.setString('accessToken', newAccessToken);
-                
-                // Retry the original request
-                final opts = error.requestOptions;
-                opts.headers['Authorization'] = 'Bearer $newAccessToken';
-                final cloneReq = await Dio().fetch(opts);
-                return handler.resolve(cloneReq);
-              }
-            } catch (e) {
-              // Refresh failed, clear tokens (user must log in again)
-              await prefs.remove('accessToken');
-              await prefs.remove('refreshToken');
-            }
-          }
-        }
-        return handler.next(error);
-      },
-    ));
-  }
   // --- Workspaces ---
 
   Future<List<dynamic>> getWorkspaces() async {
-    final response = await _dio.get('/workspaces');
+    final response = await _network.getRequest('/workspaces');
     return response.data;
   }
 
   Future<Map<String, dynamic>> createWorkspace(String name) async {
-    final response = await _dio.post('/workspaces', data: {'name': name});
+    final response = await _network.postRequest('/workspaces', data: {'name': name});
     return response.data;
   }
 
   Future<void> deleteWorkspace(String id) async {
-    await _dio.delete('/workspaces/$id');
+    await _network.deleteRequest('/workspaces/$id');
   }
 
   Future<Map<String, dynamic>> addWorkspaceMember(String workspaceId, String email, String role) async {
-    final response = await _dio.post('/workspaces/$workspaceId/members', data: {'email': email, 'role': role});
+    final response = await _network.postRequest('/workspaces/$workspaceId/members', data: {'email': email, 'role': role});
     return response.data;
   }
 
   Future<Map<String, dynamic>> updateWorkspaceMemberRole(String workspaceId, String userId, String role) async {
-    final response = await _dio.patch('/workspaces/$workspaceId/members/$userId', data: {'role': role});
+    final response = await _network.patchRequest('/workspaces/$workspaceId/members/$userId', data: {'role': role});
     return response.data;
   }
 
   Future<void> removeWorkspaceMember(String workspaceId, String userId) async {
-    await _dio.delete('/workspaces/$workspaceId/members/$userId');
+    await _network.deleteRequest('/workspaces/$workspaceId/members/$userId');
   }
+
   // --- Collections ---
   
   Future<List<dynamic>> getCollections({String? workspaceId}) async {
-    final response = await _dio.get('/collections', queryParameters: {
+    final response = await _network.getRequest('/collections', queryParameters: {
       if (workspaceId != null) 'workspaceId': workspaceId,
     });
     return response.data;
   }
 
   Future<void> importCollection(Map<String, dynamic> json, {String? workspaceId}) async {
-    await _dio.post('/collections/import', data: json, queryParameters: {
+    await _network.postRequest('/collections/import', data: json, queryParameters: {
       if (workspaceId != null) 'workspaceId': workspaceId,
     });
   }
 
   Future<Map<String, dynamic>> createCollection(String name, {String? workspaceId}) async {
-    final response = await _dio.post('/collections', data: {
+    final response = await _network.postRequest('/collections', data: {
       'name': name,
       if (workspaceId != null) 'workspace': workspaceId,
     });
@@ -100,54 +57,67 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> updateCollection(String id, Map<String, dynamic> data) async {
-    final response = await _dio.patch('/collections/$id', data: data);
-    return response.data;
-  }
-
-  Future<Map<String, dynamic>> createFolder(String parentId, String name, {String? workspaceId}) async {
-    final response = await _dio.post('/collections', data: {
-      'name': name, 
-      'parentFolder': parentId,
-      if (workspaceId != null) 'workspace': workspaceId,
-    });
+    final response = await _network.patchRequest('/collections/$id', data: data);
     return response.data;
   }
 
   Future<void> deleteCollection(String id) async {
-    await _dio.delete('/collections/$id');
+    await _network.deleteRequest('/collections/$id');
+  }
+
+  // --- Folders ---
+
+  Future<Map<String, dynamic>> createFolder(String collectionId, String name, {String? parentId}) async {
+    final response = await _network.postRequest('/folders', data: {
+      'collection': collectionId,
+      'name': name,
+      if (parentId != null) 'parent': parentId,
+    });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateFolder(String id, Map<String, dynamic> data) async {
+    final response = await _network.patchRequest('/folders/$id', data: data);
+    return response.data;
+  }
+
+  Future<void> deleteFolder(String id) async {
+    await _network.deleteRequest('/folders/$id');
   }
 
   // --- Requests ---
 
-  Future<Map<String, dynamic>> createRequest(String collectionId, String name, String method, {String requestKind = 'http'}) async {
-    final response = await _dio.post('/requests', data: {
-      'collectionId': collectionId,
+  Future<Map<String, dynamic>> createRequest(String collectionId, String name, {String? folderId, String method = 'GET', String requestKind = 'HTTP'}) async {
+    final response = await _network.postRequest('/requests', data: {
+      'collection': collectionId,
       'name': name,
       'method': method,
       'requestKind': requestKind,
+      'url': '',
+      if (folderId != null) 'folder': folderId,
     });
     return response.data;
   }
 
   Future<Map<String, dynamic>> updateRequest(String id, Map<String, dynamic> data) async {
-    final response = await _dio.patch('/requests/$id', data: data);
+    final response = await _network.patchRequest('/requests/$id', data: data);
     return response.data;
   }
 
   Future<void> deleteRequest(String id) async {
-    await _dio.delete('/requests/$id');
+    await _network.deleteRequest('/requests/$id');
   }
 
   Future<void> reorderRequests(List<String> requestIds) async {
-    await _dio.patch('/requests/reorder', data: {'requestIds': requestIds});
+    await _network.patchRequest('/requests/reorder', data: {'requestIds': requestIds});
   }
 
   Future<Map<String, dynamic>> saveResponse(String requestId, Map<String, dynamic> responseData) async {
-    final response = await _dio.post('/requests/$requestId/responses', data: responseData);
+    final response = await _network.postRequest('/requests/$requestId/responses', data: responseData);
     return response.data;
   }
 
   Future<void> deleteSavedResponse(String requestId, String responseId) async {
-    await _dio.delete('/requests/$requestId/responses/$responseId');
+    await _network.deleteRequest('/requests/$requestId/responses/$responseId');
   }
 }

@@ -1,11 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:postmanclone/app/data/providers/api_service.dart';
 import 'dart:developer';
 import 'dart:convert';
-import '../../data/providers/api_service.dart';
-import '../home/workspace_controller.dart';
-import '../../widgets/variable_hover_card.dart';
+import 'dart:async';
+
+import 'package:postmanclone/app/modules/home/controllers/workspace_controller.dart';
+import 'package:postmanclone/app/widgets/variable_hover_card.dart';
+import 'package:postmanclone/app/widgets/custom_snackbar.dart';
+
 
 class VariableTextEditingController extends TextEditingController {
   final RequestBuilderController reqController;
@@ -86,6 +90,7 @@ class RequestBuilderController extends GetxController {
   var originalSocketConfig = <String, dynamic>{};
 
   var hasUnsavedChanges = false.obs;
+  Timer? _autoSaveTimer;
   
   late final TextEditingController urlController = VariableTextEditingController(this);
   var isLoading = false.obs;
@@ -126,6 +131,10 @@ class RequestBuilderController extends GetxController {
   
   List<Widget> getVariableTooltipWidgets() {
     final workspaceController = Get.find<WorkspaceController>();
+    
+    // Explicitly track collections to trigger Obx rebuilds when variables update
+    workspaceController.collections.isEmpty;
+    
     final variables = workspaceController.getVariableDetailsForRequest(currentRequestId.value ?? '');
     
     final regex = RegExp(r'\{\{([^}]+)\}\}');
@@ -141,7 +150,7 @@ class RequestBuilderController extends GetxController {
     List<Widget> widgets = [];
     for (var varName in uniqueVars) {
       final detail = variables[varName];
-      widgets.add(VariableHoverCard(varName: varName, detail: detail));
+      widgets.add(VariableHoverCard(varName: varName, detail: detail, requestId: currentRequestId.value));
     }
     
     return widgets;
@@ -151,69 +160,82 @@ class RequestBuilderController extends GetxController {
     if (_isParsingUrl) return;
     _isParsingUrl = true;
     
-    final currentUrl = url.value;
-    final queryIndex = currentUrl.indexOf('?');
-    if (queryIndex == -1) {
-      // Keep disabled params only
-      final newParams = queryParams.where((p) => p['enabled'] == false).toList();
-      queryParams.value = newParams;
-    } else {
-      final queryString = currentUrl.substring(queryIndex + 1);
-      final pairs = queryString.split('&');
-      
-      final newParams = <Map<String, dynamic>>[];
-      for (final pair in pairs) {
-        if (pair.isEmpty) continue;
-        final parts = pair.split('=');
-        final key = parts[0];
-        final value = parts.length > 1 ? parts.sublist(1).join('=') : '';
+    try {
+      final currentUrl = url.value;
+      final queryIndex = currentUrl.indexOf('?');
+      if (queryIndex == -1) {
+        // Keep disabled params only
+        final newParams = queryParams.where((p) => p['enabled'] == false).toList();
+        queryParams.value = newParams;
+      } else {
+        final queryString = currentUrl.substring(queryIndex + 1);
+        final pairs = queryString.split('&');
         
-        final existing = queryParams.firstWhere((p) => p['key'] == Uri.decodeComponent(key) && p['enabled'] == true, orElse: () => <String, dynamic>{});
-        
-        newParams.add({
-          'key': Uri.decodeComponent(key),
-          'value': Uri.decodeComponent(value),
-          'description': existing['description'] ?? '',
-          'enabled': true,
-        });
-      }
-      
-      for (final p in queryParams) {
-        if (p['enabled'] == false) {
-          newParams.add(p);
+        final newParams = <Map<String, dynamic>>[];
+        for (final pair in pairs) {
+          if (pair.isEmpty) continue;
+          final parts = pair.split('=');
+          final key = parts[0];
+          final value = parts.length > 1 ? parts.sublist(1).join('=') : '';
+          
+          final existing = queryParams.firstWhere((p) => p['key'] == Uri.decodeComponent(key) && p['enabled'] == true, orElse: () => <String, dynamic>{});
+          
+          newParams.add({
+            'key': Uri.decodeComponent(key),
+            'value': Uri.decodeComponent(value),
+            'description': existing['description'] ?? '',
+            'enabled': true,
+          });
         }
+        
+        for (final p in queryParams) {
+          if (p['enabled'] == false) {
+            newParams.add(p);
+          }
+        }
+        
+        queryParams.value = newParams;
       }
-      
-      queryParams.value = newParams;
+    } catch (e) {
+      log('Error syncing URL to Params', error: e, name: 'RequestBuilderController');
+    } finally {
+      _isParsingUrl = false;
+      _checkUnsavedChanges();
     }
-    _isParsingUrl = false;
-    _checkUnsavedChanges();
   }
 
   void syncParamsToUrl() {
     if (_isParsingUrl) return;
     _isParsingUrl = true;
     
-    final baseUrl = url.value.split('?').first;
-    final enabledParams = queryParams.where((p) => p['enabled'] == true && (p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true)).toList();
-    
-    if (enabledParams.isEmpty) {
-      url.value = baseUrl;
-      urlController.text = baseUrl;
-    } else {
-      final queryString = enabledParams.map((p) {
-        final key = Uri.encodeComponent(p['key']?.toString() ?? '');
-        final val = Uri.encodeComponent(p['value']?.toString() ?? '');
-        return '$key=$val';
-      }).join('&');
+    try {
+      final baseUrl = url.value.split('?').first;
+      final enabledParams = queryParams.where((p) => p['enabled'] == true && (p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true)).toList();
       
-      final newUrl = '$baseUrl?$queryString';
-      url.value = newUrl;
-      urlController.text = newUrl;
+      if (enabledParams.isEmpty) {
+        url.value = baseUrl;
+        if (urlController.text != baseUrl) {
+          urlController.text = baseUrl;
+        }
+      } else {
+        final queryString = enabledParams.map((p) {
+          final key = Uri.encodeComponent(p['key']?.toString() ?? '');
+          final val = Uri.encodeComponent(p['value']?.toString() ?? '');
+          return '$key=$val';
+        }).join('&');
+        
+        final newUrl = '$baseUrl?$queryString';
+        url.value = newUrl;
+        if (urlController.text != newUrl) {
+          urlController.text = newUrl;
+        }
+      }
+    } catch (e) {
+      log('Error syncing Params to URL', error: e, name: 'RequestBuilderController');
+    } finally {
+      _isParsingUrl = false;
+      _checkUnsavedChanges();
     }
-    
-    _isParsingUrl = false;
-    _checkUnsavedChanges();
   }
 
   void _checkUnsavedChanges() {
@@ -238,6 +260,15 @@ class RequestBuilderController extends GetxController {
     }
     
     hasUnsavedChanges.value = changed;
+    
+    if (changed) {
+      _autoSaveTimer?.cancel();
+      _autoSaveTimer = Timer(const Duration(milliseconds: 1000), () {
+        if (hasUnsavedChanges.value) {
+          saveChanges(isAutoSave: true);
+        }
+      });
+    }
   }
 
   void loadRequest(Map<String, dynamic> request, {String path = 'Workspace > Collection'}) {
@@ -291,23 +322,28 @@ class RequestBuilderController extends GetxController {
     responseSize.value = response['size'] ?? 0;
   }
 
-  Future<void> saveChanges() async {
+  Future<void> saveChanges({bool isAutoSave = false}) async {
     if (currentRequestId.value == null) return;
     
     try {
-      await _apiService.updateRequest(currentRequestId.value!, {
+      final cleanQueryParams = queryParams.where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true).toList();
+      final cleanHeaders = headers.where((h) => h['key']?.toString().isNotEmpty == true || h['value']?.toString().isNotEmpty == true || h['description']?.toString().isNotEmpty == true).toList();
+
+      final updateData = {
         'url': url.value,
         'method': method.value,
         'docs': docs.value,
         'authType': authType.value,
         'authConfig': authConfig,
-        'headers': headers,
-        'queryParams': queryParams,
+        'headers': cleanHeaders,
+        'queryParams': cleanQueryParams,
         'bodyType': bodyType.value,
         'bodyFormat': bodyFormat.value,
         'body': body.value,
         'socketConfig': socketConfig,
-      });
+      };
+
+      await _apiService.updateRequest(currentRequestId.value!, updateData);
       
       originalUrl = url.value;
       originalMethod = method.value;
@@ -323,18 +359,24 @@ class RequestBuilderController extends GetxController {
       
       hasUnsavedChanges.value = false;
       
-      Get.find<WorkspaceController>().fetchCollections();
+      if (!isAutoSave) {
+        Get.find<WorkspaceController>().fetchCollections();
+      } else {
+        Get.find<WorkspaceController>().updateRequestLocally(currentRequestId.value!, updateData);
+      }
       
       log('Request saved', name: 'RequestBuilderController');
     } catch (e) {
       log('Failed to save request', error: e, name: 'RequestBuilderController');
-      Get.snackbar('Error', 'Failed to save request');
+      if (!isAutoSave) {
+        CustomSnackbar.show(title: 'Error', message: 'Failed to save request', isError: true);
+      }
     }
   }
 
   void sendRequest() async {
     if (url.value.isEmpty) {
-      Get.snackbar('Error', 'URL cannot be empty');
+      CustomSnackbar.show(title: 'Error', message: 'URL cannot be empty', isError: true);
       return;
     }
 
@@ -406,6 +448,22 @@ class RequestBuilderController extends GetxController {
       for (final h in headers) {
         if (h['enabled'] == true && h['key']?.toString().isNotEmpty == true) {
           requestHeaders[resolveVariables(h['key'])] = resolveVariables(h['value'] ?? '');
+        }
+      }
+
+      // Handle Authentication
+      if (authType.value == 'bearer') {
+        final token = resolveVariables(authConfig['token'] ?? '');
+        if (token.isNotEmpty) {
+          requestHeaders['Authorization'] = 'Bearer $token';
+        }
+      } else if (authType.value == 'basic') {
+        final username = resolveVariables(authConfig['username'] ?? '');
+        final password = resolveVariables(authConfig['password'] ?? '');
+        if (username.isNotEmpty || password.isNotEmpty) {
+          final credentials = '$username:$password';
+          final base64Credentials = base64Encode(utf8.encode(credentials));
+          requestHeaders['Authorization'] = 'Basic $base64Credentials';
         }
       }
       
@@ -486,12 +544,12 @@ class RequestBuilderController extends GetxController {
 
   Future<void> saveResponse(String name) async {
     if (currentRequestId.value == null) {
-      Get.snackbar('Error', 'Please save the request first.');
+      CustomSnackbar.show(title: 'Error', message: 'Please save the request first.', isError: true);
       return;
     }
     
     if (responseStatus.value == 0) {
-      Get.snackbar('Error', 'No response to save. Please send the request first.');
+      CustomSnackbar.show(title: 'Error', message: 'No response to save. Please send the request first.', isError: true);
       return;
     }
 
@@ -504,13 +562,13 @@ class RequestBuilderController extends GetxController {
         'size': responseSize.value,
       });
       
-      Get.snackbar('Success', 'Response saved successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Response saved successfully');
       
       // Refresh the sidebar to show the saved response
       Get.find<WorkspaceController>().fetchCollections();
     } catch (e) {
       log('Failed to save response', error: e, name: 'RequestBuilderController');
-      Get.snackbar('Error', 'Failed to save response');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to save response', isError: true);
     }
   }
 }

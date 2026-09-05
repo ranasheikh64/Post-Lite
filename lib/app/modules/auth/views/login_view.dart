@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'auth_controller.dart';
-import '../../routes/app_routes.dart';
+import 'package:postmanclone/app/routes/app_routes.dart';
+import 'package:postmanclone/app/widgets/custom_button.dart';
+import 'package:postmanclone/app/widgets/custom_textfield.dart';
+import '../controllers/auth_controller.dart';
 
-class LoginView extends StatelessWidget {
+
+class LoginView extends GetView<AuthController> {
   LoginView({Key? key}) : super(key: key);
-
-  final AuthController controller = Get.put(AuthController());
 
   @override
   Widget build(BuildContext context) {
@@ -46,21 +47,17 @@ class LoginView extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              TextField(
+              CustomTextField(
                 controller: controller.emailController,
-                decoration: const InputDecoration(
-                  hintText: 'Email address',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
+                hintText: 'Email address',
+                prefixIcon: const Icon(Icons.email_outlined),
               ),
               const SizedBox(height: 16),
-              TextField(
+              CustomTextField(
                 controller: controller.passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  hintText: 'Password',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
+                hintText: 'Password',
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
               const SizedBox(height: 8),
               Align(
@@ -71,11 +68,10 @@ class LoginView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Obx(() => ElevatedButton(
-                onPressed: controller.isLoading.value ? null : () => controller.login(),
-                child: controller.isLoading.value 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Sign In'),
+              Obx(() => CustomButton(
+                text: 'Sign In',
+                isLoading: controller.isLoading.value,
+                onPressed: () => controller.login(),
               )),
               const SizedBox(height: 16),
               TextButton(

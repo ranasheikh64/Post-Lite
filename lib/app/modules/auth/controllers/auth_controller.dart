@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../data/providers/auth_service.dart';
-import '../../routes/app_routes.dart';
+import 'package:postmanclone/app/data/providers/auth_service.dart';
+import 'package:postmanclone/app/routes/app_routes.dart';
+import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -44,7 +45,7 @@ class AuthController extends GetxController {
 
   Future<void> login() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      Get.snackbar('Error', 'Please fill all fields');
+      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
       return;
     }
 
@@ -54,7 +55,7 @@ class AuthController extends GetxController {
       await fetchProfile();
       Get.offAllNamed(Routes.HOME);
     } catch (e) {
-      Get.snackbar('Login Failed', e.toString());
+      CustomSnackbar.show(title: 'Login Failed', message: e.toString(), isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -62,17 +63,17 @@ class AuthController extends GetxController {
 
   Future<void> register() async {
     if (nameController.text.isEmpty || emailController.text.isEmpty || passwordController.text.isEmpty) {
-      Get.snackbar('Error', 'Please fill all fields');
+      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
       return;
     }
 
     try {
       isLoading.value = true;
       await _authService.register(nameController.text, emailController.text, passwordController.text);
-      Get.snackbar('Success', 'Registration successful. Please login.');
+      CustomSnackbar.show(title: 'Success', message: 'Registration successful. Please login.');
       Get.offNamed(Routes.LOGIN);
     } catch (e) {
-      Get.snackbar('Registration Failed', e.toString());
+      CustomSnackbar.show(title: 'Registration Failed', message: e.toString(), isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -80,17 +81,17 @@ class AuthController extends GetxController {
 
   Future<void> forgotPassword() async {
     if (emailController.text.isEmpty) {
-      Get.snackbar('Error', 'Please enter your email');
+      CustomSnackbar.show(title: 'Error', message: 'Please enter your email', isError: true);
       return;
     }
 
     try {
       isLoading.value = true;
       await _authService.forgotPassword(emailController.text);
-      Get.snackbar('Success', 'OTP sent to your email');
+      CustomSnackbar.show(title: 'Success', message: 'OTP sent to your email');
       Get.toNamed(Routes.RESET_PASSWORD);
     } catch (e) {
-      Get.snackbar('Failed', e.toString());
+      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -98,17 +99,17 @@ class AuthController extends GetxController {
 
   Future<void> resetPassword() async {
     if (emailController.text.isEmpty || otpController.text.isEmpty || passwordController.text.isEmpty) {
-      Get.snackbar('Error', 'Please fill all fields');
+      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
       return;
     }
 
     try {
       isLoading.value = true;
       await _authService.resetPassword(emailController.text, otpController.text, passwordController.text);
-      Get.snackbar('Success', 'Password reset successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Password reset successfully');
       Get.offAllNamed(Routes.LOGIN);
     } catch (e) {
-      Get.snackbar('Failed', e.toString());
+      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -127,9 +128,9 @@ class AuthController extends GetxController {
       await _authService.logout();
       currentUser.value = null;
       Get.offAllNamed(Routes.LOGIN);
-      Get.snackbar('Success', 'Account deleted successfully');
+      CustomSnackbar.show(title: 'Success', message: 'Account deleted successfully');
     } catch (e) {
-      Get.snackbar('Failed', e.toString());
+      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
       isLoading.value = false;
     }

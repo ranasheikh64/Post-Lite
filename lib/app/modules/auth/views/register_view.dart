@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'auth_controller.dart';
+import 'package:postmanclone/app/widgets/custom_button.dart';
+import 'package:postmanclone/app/widgets/custom_textfield.dart';
+import '../controllers/auth_controller.dart';
 
-class ForgotPasswordView extends StatelessWidget {
-  ForgotPasswordView({Key? key}) : super(key: key);
 
-  final AuthController controller = Get.put(AuthController());
+class RegisterView extends GetView<AuthController> {
+  RegisterView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Forgot Password')),
       body: Center(
         child: Container(
           width: 400,
@@ -31,7 +31,7 @@ class ForgotPasswordView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Reset Password',
+                'Create Account',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -39,30 +39,35 @@ class ForgotPasswordView extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 32),
+              CustomTextField(
+                controller: controller.nameController,
+                hintText: 'Full Name',
+                prefixIcon: const Icon(Icons.person_outline),
+              ),
               const SizedBox(height: 16),
-              const Text(
-                'Enter your email to receive an OTP.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              TextField(
+              CustomTextField(
                 controller: controller.emailController,
-                decoration: const InputDecoration(
-                  hintText: 'Email address',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
+                hintText: 'Email address',
+                prefixIcon: const Icon(Icons.email_outlined),
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: controller.passwordController,
+                obscureText: true,
+                hintText: 'Password',
+                prefixIcon: const Icon(Icons.lock_outline),
               ),
               const SizedBox(height: 32),
-              Obx(() => ElevatedButton(
-                onPressed: controller.isLoading.value ? null : () => controller.forgotPassword(),
-                child: controller.isLoading.value 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Send OTP'),
+              Obx(() => CustomButton(
+                text: 'Sign Up',
+                isLoading: controller.isLoading.value,
+                onPressed: () => controller.register(),
               )),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () => Get.back(),
-                child: const Text('Back to Sign In'),
+                child: const Text('Already have an account? Sign in'),
               ),
             ],
           ),

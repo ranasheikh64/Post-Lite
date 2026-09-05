@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'settings_controller.dart';
+import 'package:postmanclone/app/widgets/custom_button.dart';
+import '../controllers/settings_controller.dart';
 
-class SettingsView extends StatelessWidget {
+class SettingsView extends GetView<SettingsController> {
   SettingsView({Key? key}) : super(key: key);
-
-  final SettingsController settingsController = Get.put(SettingsController());
 
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
@@ -22,7 +21,7 @@ class SettingsView extends StatelessWidget {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
               Get.back();
-              settingsController.deleteAccount();
+              controller.deleteAccount();
             },
             child: const Text('Delete'),
           ),
@@ -53,9 +52,9 @@ class SettingsView extends StatelessWidget {
             ],
           ),
           child: Obx(() {
-            final user = settingsController.currentUser.value;
+            final user = controller.currentUser.value;
             
-            if (settingsController.isLoading.value) {
+            if (controller.isLoading.value) {
               return const Center(child: CircularProgressIndicator());
             }
             
@@ -84,13 +83,9 @@ class SettingsView extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: () => settingsController.logout(),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Logout'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
+                CustomButton(
+                  text: 'Logout',
+                  onPressed: () => controller.logout(),
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
