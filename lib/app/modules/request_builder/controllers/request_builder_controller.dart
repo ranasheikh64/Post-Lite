@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide MultipartFile, FormData;
 import 'package:postmanclone/app/data/providers/api_service.dart';
 import 'dart:developer';
 import 'dart:convert';
 import 'dart:async';
+import 'package:postmanclone/app/data/providers/network_caller.dart';
 
 import 'package:postmanclone/app/modules/home/controllers/workspace_controller.dart';
 import 'package:postmanclone/app/widgets/variable_hover_card.dart';
@@ -13,8 +14,20 @@ import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 
 class VariableTextEditingController extends TextEditingController {
   final RequestBuilderController reqController;
+  late Worker _worker;
 
-  VariableTextEditingController(this.reqController);
+  VariableTextEditingController(this.reqController) {
+    final workspaceController = Get.find<WorkspaceController>();
+    _worker = ever(workspaceController.collections, (_) {
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _worker.dispose();
+    super.dispose();
+  }
 
   @override
   TextSpan buildTextSpan({required BuildContext context, TextStyle? style, required bool withComposing}) {
@@ -72,6 +85,8 @@ class RequestBuilderController extends GetxController {
   var bodyType = 'none'.obs;
   var bodyFormat = 'json'.obs;
   var body = Rx<dynamic>('');
+  var formData = <Map<String, dynamic>>[].obs;
+  var urlEncodedData = <Map<String, dynamic>>[].obs;
   
   var socketConfig = <String, dynamic>{}.obs;
 
@@ -87,12 +102,20 @@ class RequestBuilderController extends GetxController {
   var originalBodyType = 'none';
   var originalBodyFormat = 'json';
   dynamic originalBody = '';
+  var originalFormData = <Map<String, dynamic>>[];
+  var originalUrlEncodedData = <Map<String, dynamic>>[];
   var originalSocketConfig = <String, dynamic>{};
 
   var hasUnsavedChanges = false.obs;
   Timer? _autoSaveTimer;
   
   late final TextEditingController urlController = VariableTextEditingController(this);
+  late final TextEditingController bodyController = TextEditingController()
+    ..addListener(() {
+      if (body.value != bodyController.text) {
+        body.value = bodyController.text;
+      }
+    });
   var isLoading = false.obs;
   
   // -- Response State --
@@ -126,10 +149,27 @@ class RequestBuilderController extends GetxController {
     ever(bodyType, (_) => _checkUnsavedChanges());
     ever(bodyFormat, (_) => _checkUnsavedChanges());
     ever(body, (_) => _checkUnsavedChanges());
+    ever(formData, (_) => _checkUnsavedChanges());
+    ever(urlEncodedData, (_) => _checkUnsavedChanges());
     ever(socketConfig, (_) => _checkUnsavedChanges());
   }
   
+  List<String> getAvailableVariables() {
+    final workspaceController = Get.find<WorkspaceController>();
+    final variables = workspaceController.getVariableDetailsForRequest(currentRequestId.value ?? '');
+    return variables.keys.toList();
+  }
+
+  Map<String, VariableDetail> getAvailableVariablesMap() {
+    final workspaceController = Get.find<WorkspaceController>();
+    return workspaceController.getVariableDetailsForRequest(currentRequestId.value ?? '');
+  }
+  
   List<Widget> getVariableTooltipWidgets() {
+    return getVariableTooltipWidgetsForText(urlController.text);
+  }
+
+  List<Widget> getVariableTooltipWidgetsForText(String text) {
     final workspaceController = Get.find<WorkspaceController>();
     
     // Explicitly track collections to trigger Obx rebuilds when variables update
@@ -138,7 +178,7 @@ class RequestBuilderController extends GetxController {
     final variables = workspaceController.getVariableDetailsForRequest(currentRequestId.value ?? '');
     
     final regex = RegExp(r'\{\{([^}]+)\}\}');
-    final matches = regex.allMatches(urlController.text);
+    final matches = regex.allMatches(text);
     
     if (matches.isEmpty) return [];
     
@@ -253,10 +293,50 @@ class RequestBuilderController extends GetxController {
                    jsonEncode(socketConfig) != jsonEncode(originalSocketConfig);
                    
     if (!changed) {
+      final currentQuery = queryParams.where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true).toList();
+      final origQuery = originalQueryParams.where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true).toList();
+      
+      final currentHeaders = headers.where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true).toList();
+      final origHeaders = originalHeaders.where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true).toList();
+      
+      final currentForm = formData.where((p) => p['key']?.toString().isNotEmpty == true).map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'type': f['type'],
+        'enabled': f['enabled'],
+        'fileName': f['fileName'],
+        'description': f['description'] ?? '',
+      }).toList();
+      
+      final origForm = originalFormData.where((p) => p['key']?.toString().isNotEmpty == true).map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'type': f['type'],
+        'enabled': f['enabled'],
+        'fileName': f['fileName'],
+        'description': f['description'] ?? '',
+      }).toList();
+
+      final currentUrlEncoded = urlEncodedData.where((p) => p['key']?.toString().isNotEmpty == true).map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'enabled': f['enabled'],
+        'description': f['description'] ?? '',
+      }).toList();
+      
+      final origUrlEncoded = originalUrlEncodedData.where((p) => p['key']?.toString().isNotEmpty == true).map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'enabled': f['enabled'],
+        'description': f['description'] ?? '',
+      }).toList();
+
       changed = jsonEncode(authConfig) != jsonEncode(originalAuthConfig) ||
-                jsonEncode(headers) != jsonEncode(originalHeaders) ||
-                jsonEncode(queryParams) != jsonEncode(originalQueryParams) ||
-                jsonEncode(body.value) != jsonEncode(originalBody);
+                jsonEncode(currentHeaders) != jsonEncode(origHeaders) ||
+                jsonEncode(currentQuery) != jsonEncode(origQuery) ||
+                jsonEncode(body.value) != jsonEncode(originalBody) ||
+                jsonEncode(currentForm) != jsonEncode(origForm) ||
+                jsonEncode(currentUrlEncoded) != jsonEncode(origUrlEncoded);
     }
     
     hasUnsavedChanges.value = changed;
@@ -287,7 +367,27 @@ class RequestBuilderController extends GetxController {
     originalQueryParams = List<Map<String, dynamic>>.from(request['queryParams'] ?? []);
     originalBodyType = request['bodyType'] ?? 'none';
     originalBodyFormat = request['bodyFormat'] ?? 'json';
-    originalBody = request['body'] ?? '';
+    
+    if (originalBodyType == 'form-data') {
+      originalFormData = List<Map<String, dynamic>>.from(request['body'] ?? []);
+      originalUrlEncodedData = [];
+      originalBody = '';
+      body.value = '';
+    } else if (originalBodyType == 'urlencoded') {
+      originalUrlEncodedData = List<Map<String, dynamic>>.from(request['body'] ?? []);
+      originalFormData = [];
+      originalBody = '';
+      body.value = '';
+    } else {
+      originalBody = request['body'] ?? '';
+      body.value = originalBody;
+      originalFormData = [];
+      originalUrlEncodedData = [];
+    }
+    
+    if (bodyController.text != body.value) {
+      bodyController.text = body.value;
+    }
     originalSocketConfig = request['socketConfig'] ?? <String, dynamic>{};
     
     requestKind.value = originalRequestKind;
@@ -302,6 +402,8 @@ class RequestBuilderController extends GetxController {
     bodyType.value = originalBodyType;
     bodyFormat.value = originalBodyFormat;
     body.value = originalBody;
+    formData.value = List<Map<String, dynamic>>.from(originalFormData);
+    urlEncodedData.value = List<Map<String, dynamic>>.from(originalUrlEncodedData);
     socketConfig.value = Map<String, dynamic>.from(originalSocketConfig);
     
     hasUnsavedChanges.value = false;
@@ -328,6 +430,21 @@ class RequestBuilderController extends GetxController {
     try {
       final cleanQueryParams = queryParams.where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true).toList();
       final cleanHeaders = headers.where((h) => h['key']?.toString().isNotEmpty == true || h['value']?.toString().isNotEmpty == true || h['description']?.toString().isNotEmpty == true).toList();
+      final cleanFormData = formData.where((f) => f['key']?.toString().isNotEmpty == true).map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'type': f['type'],
+        'enabled': f['enabled'],
+        'fileName': f['fileName'],
+        'description': f['description'],
+      }).toList();
+      
+      final cleanUrlEncodedData = urlEncodedData.where((f) => f['key']?.toString().isNotEmpty == true).map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'description': f['description'],
+        'enabled': f['enabled'],
+      }).toList();
 
       final updateData = {
         'url': url.value,
@@ -339,7 +456,7 @@ class RequestBuilderController extends GetxController {
         'queryParams': cleanQueryParams,
         'bodyType': bodyType.value,
         'bodyFormat': bodyFormat.value,
-        'body': body.value,
+        'body': bodyType.value == 'form-data' ? cleanFormData : (bodyType.value == 'urlencoded' ? cleanUrlEncodedData : body.value),
         'socketConfig': socketConfig,
       };
 
@@ -354,7 +471,21 @@ class RequestBuilderController extends GetxController {
       originalQueryParams = List<Map<String, dynamic>>.from(queryParams);
       originalBodyType = bodyType.value;
       originalBodyFormat = bodyFormat.value;
-      originalBody = body.value;
+      originalBody = bodyType.value == 'form-data' ? '' : body.value;
+      originalFormData = List<Map<String, dynamic>>.from(formData.map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'type': f['type'],
+        'enabled': f['enabled'],
+        'fileName': f['fileName'],
+        'description': f['description'],
+      }));
+      originalUrlEncodedData = List<Map<String, dynamic>>.from(urlEncodedData.map((f) => {
+        'key': f['key'],
+        'value': f['value'],
+        'description': f['description'],
+        'enabled': f['enabled']
+      }));
       originalSocketConfig = Map<String, dynamic>.from(socketConfig);
       
       hasUnsavedChanges.value = false;
@@ -481,28 +612,82 @@ class RequestBuilderController extends GetxController {
           else if (bodyFormat.value == 'xml') requestHeaders['Content-Type'] = 'application/xml';
           else requestHeaders['Content-Type'] = 'text/plain';
         }
+      } else if (bodyType.value == 'urlencoded') {
+        final params = <String>[];
+        for (final field in urlEncodedData) {
+          if (field['enabled'] == true && field['key']?.toString().isNotEmpty == true) {
+            final key = resolveVariables(field['key']);
+            final value = resolveVariables(field['value'] ?? '');
+            params.add('${Uri.encodeQueryComponent(key)}=${Uri.encodeQueryComponent(value)}');
+          }
+        }
+        requestBody = params.join('&');
+        if (!requestHeaders.containsKey('Content-Type')) {
+          requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        }
       }
-      // Note: for form-data or urlencoded, we'd compile the map here.
       
-      final response = await dio.request(
-        resolvedUrl,
-        data: requestBody,
-        options: Options(
-          method: method.value,
-          headers: requestHeaders,
-        ),
+      // Proxy Request handling to avoid CORS
+      dynamic proxyDataObj;
+      if (bodyType.value == 'form-data') {
+        final multiPartFormData = FormData();
+        multiPartFormData.fields.add(MapEntry('Proxy-Url', resolvedUrl));
+        multiPartFormData.fields.add(MapEntry('Proxy-Method', method.value));
+        multiPartFormData.fields.add(MapEntry('Proxy-Headers', jsonEncode(requestHeaders)));
+        
+        for (final field in formData) {
+          if (field['enabled'] == true && field['key']?.toString().isNotEmpty == true) {
+            final key = resolveVariables(field['key']);
+            if (field['type'] == 'file') {
+              if (field['fileBytesList'] != null && (field['fileBytesList'] as List).isNotEmpty) {
+                final fileNames = field['fileName'].toString().split(', ');
+                final bytesList = field['fileBytesList'] as List<List<int>>;
+                for (int i = 0; i < bytesList.length; i++) {
+                  multiPartFormData.files.add(MapEntry(
+                    key,
+                    MultipartFile.fromBytes(bytesList[i], filename: fileNames.length > i ? fileNames[i] : 'file_$i'),
+                  ));
+                }
+              } else if (field['fileBytes'] != null) {
+                multiPartFormData.files.add(MapEntry(
+                  key,
+                  MultipartFile.fromBytes(field['fileBytes'] as List<int>, filename: field['fileName']),
+                ));
+              }
+            } else {
+              multiPartFormData.fields.add(MapEntry(key, resolveVariables(field['value'] ?? '')));
+            }
+          }
+        }
+        proxyDataObj = multiPartFormData;
+      } else {
+        proxyDataObj = {
+          'method': method.value,
+          'url': resolvedUrl,
+          'headers': requestHeaders,
+          'body': requestBody,
+        };
+      }
+
+      final proxyUrl = '${NetworkCaller().baseUrl}/proxy';
+      final response = await dio.post(
+        proxyUrl,
+        data: proxyDataObj,
       );
       
       stopwatch.stop();
       responseTime.value = stopwatch.elapsedMilliseconds;
-      responseStatus.value = response.statusCode ?? 200;
       
-      final dataString = response.data.toString();
+      final proxyData = response.data;
+      responseStatus.value = proxyData['status'] ?? 200;
+      
+      final actualData = proxyData['data'];
+      final dataString = actualData?.toString() ?? '';
       responseSize.value = dataString.length;
       
       try {
-        if (response.data is Map || response.data is List) {
-          responseData.value = const JsonEncoder.withIndent('  ').convert(response.data);
+        if (actualData is Map || actualData is List) {
+          responseData.value = const JsonEncoder.withIndent('  ').convert(actualData);
         } else {
           responseData.value = dataString;
         }
@@ -541,10 +726,10 @@ class RequestBuilderController extends GetxController {
       isLoading.value = false;
     }
   }
-
+  
   Future<void> saveResponse(String name) async {
     if (currentRequestId.value == null) {
-      CustomSnackbar.show(title: 'Error', message: 'Please save the request first.', isError: true);
+      CustomSnackbar.show(title: 'Error', message: 'No request selected', isError: true);
       return;
     }
     
@@ -570,5 +755,12 @@ class RequestBuilderController extends GetxController {
       log('Failed to save response', error: e, name: 'RequestBuilderController');
       CustomSnackbar.show(title: 'Error', message: 'Failed to save response', isError: true);
     }
+  // ignore: invalid_annotation_target
+  @override
+  // ignore: unused_element
+  void onClose() {
+    urlController.dispose();
+    bodyController.dispose();
+    super.onClose();
   }
-}
+}}

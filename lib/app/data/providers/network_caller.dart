@@ -7,10 +7,12 @@ class NetworkCaller {
   factory NetworkCaller() => _instance;
 
   late Dio _dio;
+  
+  String get baseUrl => _dio.options.baseUrl;
 
   NetworkCaller._internal() {
     _dio = Dio(BaseOptions(
-      baseUrl: 'http://10.0.60.243:4000',
+      baseUrl: 'http://127.0.0.1:4000',
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
     ));

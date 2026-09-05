@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
 import 'package:get/get.dart';
 import 'package:postmanclone/app/core/theme/app_theme.dart';
 import '../controllers/request_builder_controller.dart';
 import 'websocket_builder_view.dart';
 import 'socketio_builder_view.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:postmanclone/app/widgets/variable_autocomplete_textfield.dart';
 import '../../../widgets/interactive_tooltip.dart';
 
 class RequestBuilderView extends GetView<RequestBuilderController> {
@@ -156,52 +159,48 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                         ),
                         // URL Input
                         Expanded(
-                          child: AnimatedBuilder(
-                            animation: controller.urlController,
-                            builder: (context, child) {
-                              return Obx(() {
-                                final hoverWidgets = controller
-                                    .getVariableTooltipWidgets();
-                                final textField = TextField(
-                                  controller: controller.urlController,
-                                  style: const TextStyle(fontSize: 13),
-                                  decoration: const InputDecoration(
-                                    hoverColor: Colors.transparent,
-                                    filled: false,
-                                    hintText: 'Enter URL or paste text',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 13,
-                                    ),
-                                    border: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    errorBorder: InputBorder.none,
-                                    disabledBorder: InputBorder.none,
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ), // Center align text
-                                    isDense: true,
-                                  ),
-                                );
+                          child: Obx(() {
+                            final hoverWidgets = controller.getVariableTooltipWidgets();
+                            final textField = VariableAutocompleteTextField(
+                              controller: controller.urlController,
+                              style: const TextStyle(fontSize: 13),
+                              decoration: const InputDecoration(
+                                hoverColor: Colors.transparent,
+                                filled: false,
+                                hintText: 'Enter URL or paste text',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                                border: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                isDense: true,
+                              ),
+                              onChanged: (val) {
+                                // urlController listener already handles this
+                              },
+                            );
 
-                                if (hoverWidgets.isEmpty) {
-                                  return textField;
-                                }
+                            if (hoverWidgets.isEmpty) {
+                              return textField;
+                            }
 
-                                return InteractiveTooltip(
-                                  popup: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: hoverWidgets,
-                                  ),
-                                  child: textField,
-                                );
-                              });
-                            },
-                          ),
+                            return InteractiveTooltip(
+                              popup: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: hoverWidgets,
+                              ),
+                              child: textField,
+                            );
+                          }),
                         ),
                       ],
                     ),
@@ -1045,6 +1044,20 @@ class _BodyView extends StatelessWidget {
                 ),
               );
             }
+            if (controller.bodyType.value == 'form-data') {
+              return _FormDataTableView(
+                title: 'FormData',
+                items: controller.formData,
+                onChanged: () => controller.hasUnsavedChanges.value = true,
+              );
+            }
+            if (controller.bodyType.value == 'urlencoded') {
+              return _DynamicTableView(
+                title: 'URLEncoded',
+                items: controller.urlEncodedData,
+                onChanged: () => controller.hasUnsavedChanges.value = true,
+              );
+            }
             return Center(
               child: Text(
                 '${controller.bodyType.value} editor coming soon',
@@ -1199,15 +1212,356 @@ class _DynamicTableView extends StatelessWidget {
                                 items.value = newItems;
                                 onChanged();
                               },
+                              activeColor: const Color(0xFFE65100),
                             ),
                           ),
                           DataCell(
                             SizedBox(
                               width: columnWidth,
-                              child: TextFormField(
+                              child: VariableAutocompleteTextField(
                                 key: ValueKey(
                                   '${controller.currentRequestId.value}_${title}_key_$uniqueId',
                                 ),
+                                isKey: true,
+                                initialValue: item['key'],
+                                onChanged: (val) {
+                                  final newItems =
+                                      List<Map<String, dynamic>>.from(items);
+                                  newItems[idx]['key'] = val;
+                                  items.value = newItems;
+                                  onChanged();
+                                },
+                                decoration: InputDecoration(
+                                  hoverColor: Colors.transparent,
+                                  filled: false,
+                                  hintText: 'Key',
+                                  hintStyle: TextStyle(color: Colors.grey[700]),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: const BorderSide(
+                                      color: Colors.transparent,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: const BorderSide(
+                                      color: Colors.transparent,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(
+                                      color: const Color(
+                                        0xFFE65100,
+                                      ).withValues(alpha: 0.3),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: columnWidth,
+                              child: Builder(
+                                builder: (context) {
+                                  final valText = item['value'] ?? '';
+                                  final textField = VariableAutocompleteTextField(
+                                    key: ValueKey(
+                                      '${controller.currentRequestId.value}_${title}_val_$uniqueId',
+                                    ),
+                                    isKey: false,
+                                    initialValue: valText,
+                                    onChanged: (val) {
+                                      final newItems =
+                                          List<Map<String, dynamic>>.from(items);
+                                      newItems[idx]['value'] = val;
+                                      items.value = newItems;
+                                      onChanged();
+                                    },
+                                    decoration: InputDecoration(
+                                      hoverColor: Colors.transparent,
+                                      filled: false,
+                                      hintText: 'Value',
+                                      hintStyle: TextStyle(color: Colors.grey[700]),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        borderSide: const BorderSide(
+                                          color: Colors.transparent,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        borderSide: const BorderSide(
+                                          color: Colors.transparent,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        borderSide: BorderSide(
+                                          color: const Color(
+                                            0xFFE65100,
+                                          ).withValues(alpha: 0.3),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 8,
+                                      ),
+                                      suffixIcon: valText.isNotEmpty 
+                                          ? IconButton(
+                                              icon: const Icon(Icons.edit_note, size: 16, color: Colors.grey),
+                                              tooltip: 'Edit / Copy Value',
+                                              onPressed: () {
+                                                _showEditValueDialog(context, valText, (newValue) {
+                                                  final newItems = List<Map<String, dynamic>>.from(items);
+                                                  newItems[idx]['value'] = newValue;
+                                                  items.value = newItems;
+                                                  onChanged();
+                                                });
+                                              },
+                                            )
+                                          : null,
+                                    ),
+                                  );
+
+                                  final hoverWidgets = controller
+                                      .getVariableTooltipWidgetsForText(valText);
+                                      
+                                  Widget resultField = valText.length > 20 
+                                      ? Tooltip(
+                                          message: valText,
+                                          waitDuration: const Duration(milliseconds: 500),
+                                          padding: const EdgeInsets.all(8),
+                                          textStyle: const TextStyle(fontSize: 12, color: Colors.white),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF2C2C2C),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.grey[800]!),
+                                          ),
+                                          child: textField,
+                                        )
+                                      : textField;
+
+                                  if (hoverWidgets.isEmpty) return resultField;
+
+                                  return InteractiveTooltip(
+                                    popup: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: hoverWidgets,
+                                    ),
+                                    child: resultField,
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: columnWidth,
+                              child: VariableAutocompleteTextField(
+                                key: ValueKey(
+                                  '${controller.currentRequestId.value}_${title}_desc_$uniqueId',
+                                ),
+                                isKey: false,
+                                initialValue: item['description'],
+                                onChanged: (val) {
+                                  final newItems =
+                                      List<Map<String, dynamic>>.from(items);
+                                  newItems[idx]['description'] = val;
+                                  items.value = newItems;
+                                  onChanged();
+                                },
+                                decoration: InputDecoration(
+                                  hoverColor: Colors.transparent,
+                                  filled: false,
+                                  hintText: 'Description',
+                                  hintStyle: TextStyle(color: Colors.grey[700]),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: const BorderSide(
+                                      color: Colors.transparent,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: const BorderSide(
+                                      color: Colors.transparent,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(
+                                      color: const Color(
+                                        0xFFE65100,
+                                      ).withValues(alpha: 0.3),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            !isLast
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () {
+                                      final newItems =
+                                          List<Map<String, dynamic>>.from(
+                                            items,
+                                          );
+                                      newItems.removeAt(idx);
+                                      items.value = newItems;
+                                      onChanged();
+                                    },
+                                  )
+                                : const SizedBox(),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  );
+                }),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FormDataTableView extends StatelessWidget {
+  final String title;
+  final RxList<Map<String, dynamic>> items;
+  final VoidCallback onChanged;
+
+  const _FormDataTableView({
+    required this.title,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.find<RequestBuilderController>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth = constraints.maxWidth - 200;
+              final columnWidth = availableWidth > 0
+                  ? availableWidth / 3
+                  : 100.0;
+
+              return SingleChildScrollView(
+                child: Obx(() {
+                  bool needsEmptyRow =
+                      items.isEmpty ||
+                      (items.last['key']?.toString().isNotEmpty == true ||
+                          items.last['value']?.toString().isNotEmpty == true ||
+                          items.last['fileName']?.toString().isNotEmpty ==
+                              true);
+
+                  if (needsEmptyRow) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      items.add({
+                        'key': '',
+                        'value': '',
+                        'type': 'text',
+                        'description': '',
+                        'enabled': true,
+                        'fileName': '',
+                        'fileBytes': null,
+                        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                      });
+                    });
+                  }
+
+                  return DataTable(
+                    headingRowHeight: 40,
+                    dataRowMinHeight: 48,
+                    dataRowMaxHeight: 48,
+                    horizontalMargin: 16,
+                    columnSpacing: 16,
+                    dividerThickness: 1,
+                    headingTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                    columns: const [
+                      DataColumn(label: SizedBox()),
+                      DataColumn(label: Text('KEY')),
+                      DataColumn(label: Text('TYPE')),
+                      DataColumn(label: Text('VALUE')),
+                      DataColumn(label: Text('DESCRIPTION')),
+                      DataColumn(label: SizedBox()),
+                    ],
+                    rows: items.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final item = entry.value;
+                      final isLast = idx == items.length - 1;
+                      final uniqueId = item['id'] ?? idx.toString();
+                      final type = item['type'] ?? 'text';
+
+                      return DataRow(
+                        cells: [
+                          DataCell(
+                            !isLast
+                                ? Checkbox(
+                                    value: item['enabled'] ?? true,
+                                    onChanged: (val) {
+                                      final newItems =
+                                          List<Map<String, dynamic>>.from(
+                                            items,
+                                          );
+                                      newItems[idx]['enabled'] = val;
+                                      items.value = newItems;
+                                      onChanged();
+                                    },
+                                    activeColor: const Color(0xFFE65100),
+                                  )
+                                : const SizedBox(),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: columnWidth,
+                              child: VariableAutocompleteTextField(
+                                key: ValueKey(
+                                  '${controller.currentRequestId.value}_${title}_key_$uniqueId',
+                                ),
+                                isKey: true,
                                 initialValue: item['key'],
                                 onChanged: (val) {
                                   final newItems =
@@ -1252,51 +1606,57 @@ class _DynamicTableView extends StatelessWidget {
                             ),
                           ),
                           DataCell(
-                            SizedBox(
-                              width: columnWidth,
-                              child: TextFormField(
-                                key: ValueKey(
-                                  '${controller.currentRequestId.value}_${title}_val_$uniqueId',
-                                ),
-                                initialValue: item['value'],
-                                onChanged: (val) {
-                                  final newItems =
-                                      List<Map<String, dynamic>>.from(items);
-                                  newItems[idx]['value'] = val;
-                                  items.value = newItems;
-                                  onChanged();
-                                },
-                                decoration: InputDecoration(
-                                  hoverColor: Colors.transparent,
-                                  filled: false,
-                                  hintText: 'Value',
-                                  hintStyle: TextStyle(color: Colors.grey[700]),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: const BorderSide(
-                                      color: Colors.transparent,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: const BorderSide(
-                                      color: Colors.transparent,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: const Color(
-                                        0xFFE65100,
-                                      ).withOpacity(0.3),
-                                      width: 1.5,
-                                    ),
-                                  ),
+                            Container(
+                              width: 80,
+                              height: 32,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.transparent),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: type,
+                                  isExpanded: true,
                                   isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
+                                  focusColor: Colors.transparent,
+                                  icon: const Icon(
+                                    Icons.expand_more,
+                                    size: 16,
+                                    color: Colors.grey,
                                   ),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
+                                  dropdownColor: const Color(0xFF2C2C2C),
+                                  onChanged: (String? newValue) {
+                                    if (newValue != null) {
+                                      final newItems =
+                                          List<Map<String, dynamic>>.from(
+                                            items,
+                                          );
+                                      newItems[idx]['type'] = newValue;
+                                      newItems[idx]['value'] = '';
+                                      newItems[idx]['fileName'] = '';
+                                      newItems[idx]['fileBytes'] = null;
+                                      items.value = newItems;
+                                      onChanged();
+                                    }
+                                  },
+                                  items: <String>['text', 'file']
+                                      .map<DropdownMenuItem<String>>((
+                                        String value,
+                                      ) {
+                                        return DropdownMenuItem<String>(
+                                          value: value,
+                                          child: Text(value),
+                                        );
+                                      })
+                                      .toList(),
                                 ),
                               ),
                             ),
@@ -1304,11 +1664,213 @@ class _DynamicTableView extends StatelessWidget {
                           DataCell(
                             SizedBox(
                               width: columnWidth,
-                              child: TextFormField(
-                                key: ValueKey(
-                                  '${controller.currentRequestId.value}_${title}_desc_$uniqueId',
-                                ),
-                                initialValue: item['description'],
+                              child: type == 'text'
+                                  ? Builder(
+                                      builder: (context) {
+                                        final valText = item['value'] ?? '';
+                                        final textField =
+                                            VariableAutocompleteTextField(
+                                              key: ValueKey(
+                                                '${controller.currentRequestId.value}_${title}_value_$uniqueId',
+                                              ),
+                                              isKey: false,
+                                              initialValue: valText,
+                                              onChanged: (val) {
+                                                final newItems =
+                                                    List<
+                                                      Map<String, dynamic>
+                                                    >.from(items);
+                                                newItems[idx]['value'] = val;
+                                                items.value = newItems;
+                                                onChanged();
+                                              },
+                                              decoration: InputDecoration(
+                                                hoverColor: Colors.transparent,
+                                                filled: false,
+                                                hintText: 'Value',
+                                                hintStyle: TextStyle(
+                                                  color: Colors.grey[700],
+                                                ),
+                                                border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  borderSide: const BorderSide(
+                                                    color: Colors.transparent,
+                                                  ),
+                                                ),
+                                                enabledBorder:
+                                                    OutlineInputBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                      borderSide:
+                                                          const BorderSide(
+                                                            color: Colors
+                                                                .transparent,
+                                                          ),
+                                                    ),
+                                                focusedBorder:
+                                                    OutlineInputBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                      borderSide: BorderSide(
+                                                        color:
+                                                            const Color(
+                                                              0xFFE65100,
+                                                            ).withValues(
+                                                              alpha: 0.3,
+                                                            ),
+                                                        width: 1.5,
+                                                      ),
+                                                    ),
+                                                isDense: true,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 8,
+                                                    ),
+                                                suffixIcon: valText.isNotEmpty 
+                                                    ? IconButton(
+                                                        icon: const Icon(Icons.edit_note, size: 16, color: Colors.grey),
+                                                        tooltip: 'Edit / Copy Value',
+                                                        onPressed: () {
+                                                          _showEditValueDialog(context, valText, (newValue) {
+                                                            final newItems = List<Map<String, dynamic>>.from(items);
+                                                            newItems[idx]['value'] = newValue;
+                                                            items.value = newItems;
+                                                            onChanged();
+                                                          });
+                                                        },
+                                                      )
+                                                    : null,
+                                              ),
+                                            );
+
+                                        final hoverWidgets = controller
+                                            .getVariableTooltipWidgetsForText(
+                                              valText,
+                                            );
+
+                                        Widget resultField = valText.length > 20 
+                                            ? Tooltip(
+                                                message: valText,
+                                                waitDuration: const Duration(milliseconds: 500),
+                                                padding: const EdgeInsets.all(8),
+                                                textStyle: const TextStyle(fontSize: 12, color: Colors.white),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF2C2C2C),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: Colors.grey[800]!),
+                                                ),
+                                                child: textField,
+                                              )
+                                            : textField;
+
+                                        if (hoverWidgets.isEmpty)
+                                          return resultField;
+
+                                        return InteractiveTooltip(
+                                          popup: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: hoverWidgets,
+                                          ),
+                                          child: resultField,
+                                        );
+                                      },
+                                    )
+                                  : Row(
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            try {
+                                              var result = await FilePicker.pickFiles(allowMultiple: true);
+                                              // ignore: unnecessary_null_comparison
+                                              if (result != null && result.isNotEmpty) {
+                                                final newItems = List<Map<String, dynamic>>.from(items);
+                                                
+                                                final fileNames = result.map((f) => f.name).join(', ');
+                                                newItems[idx]['fileName'] = fileNames;
+                                                
+                                                List<List<int>> bytesList = [];
+                                                for (var file in result) {
+                                                  try {
+                                                    bytesList.add(await file.xFile.readAsBytes());
+                                                  } catch (e) {
+                                                    dynamic dynFile = file;
+                                                    bytesList.add(dynFile.bytes);
+                                                  }
+                                                }
+                                                newItems[idx]['fileBytesList'] = bytesList;
+                                                // Keep the first one for backward compatibility if needed by other parts
+                                                newItems[idx]['fileBytes'] = bytesList.isNotEmpty ? bytesList.first : null;
+                                                
+                                                items.value = newItems;
+                                                onChanged();
+                                              }
+                                            } catch (e) {
+                                              debugPrint('Error picking file: $e');
+                                            }
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF333333),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                                            minimumSize: const Size(0, 32),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(6),
+                                              side: BorderSide(color: Colors.grey[700]!, width: 0.5),
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                          child: Text(
+                                            item['fileName']?.toString().isNotEmpty == true ? 'Change File(s)' : 'Select File', 
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            (item['fileName']
+                                                        ?.toString()
+                                                        .isNotEmpty ==
+                                                    true)
+                                                ? item['fileName']
+                                                : 'No file selected',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color:
+                                                  (item['fileName']
+                                                          ?.toString()
+                                                          .isNotEmpty ==
+                                                      true)
+                                                  ? Colors.white
+                                                  : Colors.grey[600],
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: columnWidth,
+                              child: TextField(
+                                style: const TextStyle(fontSize: 13),
+                                controller:
+                                    TextEditingController(
+                                        text: item['description'] ?? '',
+                                      )
+                                      ..selection = TextSelection.collapsed(
+                                        offset:
+                                            (item['description'] ?? '').length,
+                                      ),
                                 onChanged: (val) {
                                   final newItems =
                                       List<Map<String, dynamic>>.from(items);
@@ -1385,4 +1947,73 @@ class _DynamicTableView extends StatelessWidget {
       ],
     );
   }
+}
+
+void _showEditValueDialog(BuildContext context, String initialValue, Function(String) onSave) {
+  final controller = TextEditingController(text: initialValue);
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF1E1E1E),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Edit Value', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
+            tooltip: 'Copy to Clipboard',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: controller.text));
+              Get.snackbar(
+                'Copied', 
+                'Value copied to clipboard',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFFE65100),
+                colorText: Colors.white,
+                margin: const EdgeInsets.all(16),
+                duration: const Duration(seconds: 2),
+              );
+            },
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 500,
+        child: TextField(
+          controller: controller,
+          maxLines: 10,
+          style: const TextStyle(fontSize: 13, color: Colors.white),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF2C2C2C),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: const Color(0xFFE65100).withOpacity(0.5))),
+          ),
+        ),
+      ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE65100),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            elevation: 0,
+          ),
+          onPressed: () {
+            onSave(controller.text);
+            Get.back();
+          },
+          child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ),
+  );
 }

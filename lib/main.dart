@@ -10,16 +10,16 @@ import 'app/core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Hive for local storage
   await Hive.initFlutter();
-  
+
   // Check auth state for initial routing
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('accessToken');
-  
+
   String initialRoute = Routes.LOGIN;
-  
+
   if (token != null && token.isNotEmpty) {
     bool isExpired = JwtDecoder.isExpired(token);
     if (!isExpired) {
@@ -33,7 +33,7 @@ void main() async {
 
   runApp(
     GetMaterialApp(
-      title: 'Jronix API Client',
+      title: 'Jronix Post Lite',
       theme: AppTheme.darkTheme,
       initialRoute: initialRoute,
       getPages: AppPages.pages,

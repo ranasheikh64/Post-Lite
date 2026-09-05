@@ -34,6 +34,17 @@ class _VariableHoverCardState extends State<VariableHoverCard> {
   }
 
   @override
+  void didUpdateWidget(covariant VariableHoverCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.detail?.value != oldWidget.detail?.value) {
+      if (_controller.text != (widget.detail?.value ?? '')) {
+        _controller.text = widget.detail?.value ?? '';
+      }
+      _isSaved = widget.detail != null;
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _debounce?.cancel();

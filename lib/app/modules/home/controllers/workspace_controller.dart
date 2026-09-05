@@ -474,13 +474,25 @@ class WorkspaceController extends GetxController {
     }
   }
 
-  Future<void> createCollection(String name) async {
+  Future<String?> createCollection(String name) async {
     try {
-      await _apiService.createCollection(name, workspaceId: selectedWorkspaceId.value);
+      final res = await _apiService.createCollection(name, workspaceId: selectedWorkspaceId.value);
       await fetchCollections(); // Refresh list
+      // Extract the new collection ID from the response or from the latest collections list
+      if (res.containsKey('data') && res['data'] != null && res['data'].containsKey('_id')) {
+        return res['data']['_id'];
+      }
+      if (res.containsKey('_id')) {
+        return res['_id'];
+      }
+      if (collections.isNotEmpty) {
+        return collections.last['_id'];
+      }
+      return null;
     } catch (e, stack) {
       log('Failed to create collection', error: e, stackTrace: stack, name: 'WorkspaceController');
       CustomSnackbar.show(title: 'Error', message: 'Failed to create collection', isError: true);
+      return null;
     }
   }
 

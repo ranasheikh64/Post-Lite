@@ -23,10 +23,10 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
-    nameController.dispose();
-    otpController.dispose();
+    // emailController.dispose();
+    // passwordController.dispose();
+    // nameController.dispose();
+    // otpController.dispose();
     super.onClose();
   }
 

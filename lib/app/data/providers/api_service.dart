@@ -10,6 +10,11 @@ class ApiService {
     return response.data;
   }
 
+  Future<List<dynamic>> searchUsers(String query) async {
+    final response = await _network.getRequest('/auth/users', queryParameters: {'search': query});
+    return response.data;
+  }
+
   Future<Map<String, dynamic>> createWorkspace(String name) async {
     final response = await _network.postRequest('/workspaces', data: {'name': name});
     return response.data;
@@ -89,12 +94,12 @@ class ApiService {
 
   Future<Map<String, dynamic>> createRequest(String collectionId, String name, {String? folderId, String method = 'GET', String requestKind = 'HTTP'}) async {
     final response = await _network.postRequest('/requests', data: {
-      'collection': collectionId,
+      'collectionId': collectionId,
       'name': name,
       'method': method,
       'requestKind': requestKind,
       'url': '',
-      if (folderId != null) 'folder': folderId,
+      if (folderId != null) 'folderId': folderId,
     });
     return response.data;
   }

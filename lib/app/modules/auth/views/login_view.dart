@@ -17,13 +17,22 @@ class LoginView extends GetView<AuthController> {
           width: 400,
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+              width: 1.5,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
+              ),
+              BoxShadow(
+                color: const Color(0xFFE65100).withOpacity(0.05),
+                blurRadius: 50,
+                spreadRadius: 10,
               ),
             ],
           ),
@@ -31,19 +40,37 @@ class LoginView extends GetView<AuthController> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE65100).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.rocket_launch_rounded,
+                  size: 56,
+                  color: Color(0xFFE65100),
+                ),
+              ),
+              const SizedBox(height: 24),
               const Text(
                 'Jronix API Client',
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                  letterSpacing: -0.5,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
-                'Sign in to sync your workspace',
-                style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
+                'Sign in to sync your workspace, manage collections, and collaborate with your team in real-time.',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                  height: 1.5,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
