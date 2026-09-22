@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
+import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
+import 'package:postmanclone/app/modules/request_builder/widgets/events_table_view.dart'; // For EventsTableView
 
 class SocketIOBuilderView extends StatefulWidget {
   const SocketIOBuilderView({Key? key}) : super(key: key);
@@ -89,11 +91,21 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     return headers;
   }
 
+  Map<String, String> _getQueryParams() {
+    final Map<String, String> queryParams = {};
+    for (var q in reqController.queryParams) {
+      if (q['enabled'] == true && q['key'].toString().isNotEmpty) {
+        queryParams[q['key']] = q['value'];
+      }
+    }
+    return queryParams;
+  }
+
   void _connect() {
     if (socketController.isConnected.value) {
       socketController.disconnect();
     } else {
-      socketController.connectSocketIO(reqController.url.value, _getHeaders());
+      socketController.connectSocketIO(reqController.url.value, _getHeaders(), _getQueryParams());
     }
   }
 
@@ -113,14 +125,17 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Obx(
-                () => Text(
-                  '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null
-                      ? "New Socket.io Request"
-                      : reqController.url.value.split("/").last.isEmpty
-                      ? "Unnamed Socket.io Request"
-                      : reqController.url.value.split("/").last}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+              Expanded(
+                child: Obx(
+                  () => Text(
+                    '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null
+                        ? "New Socket.io Request"
+                        : reqController.url.value.split("/").last.isEmpty
+                        ? "Unnamed Socket.io Request"
+                        : reqController.url.value.split("/").last}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
               Row(
@@ -271,133 +286,210 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Top Box: Composer
+                      // Top Box: Tabs and Composer
                       SizedBox(
                         height: h,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[800]!),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                        child: DefaultTabController(
+                          length: 6,
+                          initialIndex: 4, // Default to Message
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+                              const TabBar(
+                                isScrollable: true,
+                                tabAlignment: TabAlignment.start,
+                                dividerColor: Colors.transparent,
+                                indicatorColor: Colors.orange,
+                                indicatorWeight: 2,
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Colors.grey,
+                                labelStyle: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                color: Colors.grey[900],
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Message',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                tabs: [
+                                  Tab(text: 'Docs'),
+                                  Tab(text: 'Params'),
+                                  Tab(text: 'Headers'),
+                                  Tab(text: 'Events'),
+                                  Tab(text: 'Message'),
+                                  Tab(text: 'Settings'),
+                                ],
                               ),
+                              const Divider(height: 1, color: Colors.white10),
                               Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Column(
-                                    children: [
-                                      Expanded(
-                                        child: TextField(
-                                          controller: messageController,
-                                          maxLines: null,
-                                          expands: true,
-                                          textAlignVertical:
-                                              TextAlignVertical.top,
-                                          style: const TextStyle(
-                                            fontFamily: 'monospace',
-                                            fontSize: 13,
-                                          ),
-                                          decoration: const InputDecoration(
-                                            hoverColor: Colors.transparent,
-                                            filled: false,
-                                            hintText: 'Enter JSON payload...',
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                          ),
+                                child: TabBarView(
+                                  children: [
+                                     DocsView(),
+                                    DynamicTableView(
+                                      items: reqController.queryParams,
+                                      title: 'Query Params',
+                                      onChanged: reqController.syncParamsToUrl,
+                                    ),
+                                    DynamicTableView(
+                                      items: reqController.headers,
+                                      title: 'Headers',
+                                      onChanged:
+                                          () =>
+                                              reqController
+                                                  .hasUnsavedChanges
+                                                  .value = true,
+                                    ),
+                                    EventsTableView(
+                                      items: reqController.socketEvents,
+                                      onChanged:
+                                          () =>
+                                              reqController
+                                                  .hasUnsavedChanges
+                                                  .value = true,
+                                    ),
+                                    // Message Composer
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.grey[800]!,
+                                        ),
+                                        borderRadius: const BorderRadius.only(
+                                          bottomLeft: Radius.circular(8),
+                                          bottomRight: Radius.circular(8),
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
+                                      child: Column(
                                         children: [
-                                          SizedBox(
-                                            width: 150,
-                                            child: TextField(
-                                              controller: eventController,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                              ),
-                                              decoration: const InputDecoration(
-                                                hoverColor: Colors.transparent,
-                                                filled: false,
-                                                hintText: 'Event name',
-                                                border: OutlineInputBorder(),
-                                                isDense: true,
-                                                contentPadding:
-                                                    EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 8,
-                                                    ),
-                                              ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            color: Colors.grey[900],
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'Payload',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          Obx(
-                                            () => ElevatedButton(
-                                              onPressed:
-                                                  socketController
-                                                      .isConnected
-                                                      .value
-                                                  ? () {
-                                                      if (messageController
-                                                          .text
-                                                          .isNotEmpty) {
-                                                        socketController
-                                                            .sendMessage(
-                                                              messageController
-                                                                  .text,
-                                                              eventName:
-                                                                  eventController
-                                                                      .text,
-                                                            );
-                                                        messageController
-                                                            .clear();
-                                                      }
-                                                    }
-                                                  : null,
-                                              style: ElevatedButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 24,
-                                                      vertical: 12,
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Column(
+                                                children: [
+                                                  Expanded(
+                                                    child: TextField(
+                                                      controller: messageController,
+                                                      maxLines: null,
+                                                      expands: true,
+                                                      textAlignVertical:
+                                                          TextAlignVertical.top,
+                                                      style: const TextStyle(
+                                                        fontFamily: 'monospace',
+                                                        fontSize: 13,
+                                                      ),
+                                                      decoration: const InputDecoration(
+                                                        hoverColor:
+                                                            Colors.transparent,
+                                                        filled: false,
+                                                        hintText:
+                                                            'Enter JSON payload...',
+                                                        border: InputBorder.none,
+                                                        isDense: true,
+                                                      ),
                                                     ),
-                                                backgroundColor: const Color(
-                                                  0xFF2563EB,
-                                                ),
-                                                foregroundColor: Colors.white,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.end,
+                                                    children: [
+                                                      SizedBox(
+                                                        width: 150,
+                                                        child: TextField(
+                                                          controller:
+                                                              eventController,
+                                                          style: const TextStyle(
+                                                            fontSize: 13,
+                                                          ),
+                                                          decoration: const InputDecoration(
+                                                            hoverColor:
+                                                                Colors.transparent,
+                                                            filled: false,
+                                                            hintText:
+                                                                'Event name',
+                                                            border: OutlineInputBorder(),
+                                                            isDense: true,
+                                                            contentPadding:
+                                                                EdgeInsets.symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 8,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Obx(
+                                                        () => ElevatedButton(
+                                                          onPressed:
+                                                              socketController
+                                                                  .isConnected
+                                                                  .value
+                                                              ? () {
+                                                                  if (messageController
+                                                                      .text
+                                                                      .isNotEmpty) {
+                                                                    socketController
+                                                                        .sendMessage(
+                                                                          messageController
+                                                                              .text,
+                                                                          eventName:
+                                                                              eventController
+                                                                                  .text,
+                                                                        );
+                                                                    messageController
+                                                                        .clear();
+                                                                  }
+                                                                }
+                                                              : null,
+                                                          style: ElevatedButton.styleFrom(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 24,
+                                                                  vertical: 12,
+                                                                ),
+                                                            backgroundColor: const Color(
+                                                              0xFF2563EB,
+                                                            ),
+                                                            foregroundColor: Colors.white,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(4),
+                                                            ),
+                                                          ),
+                                                          child: const Text('Send'),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                               ),
-                                              child: const Text('Send'),
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const Center(
+                                      child: Text(
+                                        'Settings coming soon',
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],

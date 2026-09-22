@@ -59,6 +59,15 @@ class LoginView extends GetView<AuthController> {
                 hintText: 'Password',
                 prefixIcon: const Icon(Icons.lock_outline),
               ),
+              Obx(() => controller.loginError.value.isNotEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                      child: Text(
+                        controller.loginError.value,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                      ),
+                    )
+                  : const SizedBox.shrink()),
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,

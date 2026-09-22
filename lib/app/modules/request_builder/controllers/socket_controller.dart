@@ -39,7 +39,11 @@ class SocketController extends GetxController {
     
     try {
       var wsUrl = url;
-      if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+      if (wsUrl.startsWith('http://')) {
+        wsUrl = wsUrl.replaceFirst('http://', 'ws://');
+      } else if (wsUrl.startsWith('https://')) {
+        wsUrl = wsUrl.replaceFirst('https://', 'wss://');
+      } else if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
         wsUrl = 'ws://$wsUrl';
       }
       
@@ -72,7 +76,7 @@ class SocketController extends GetxController {
   }
 
   // Connect Socket.IO
-  void connectSocketIO(String url, Map<String, String> headers) {
+  void connectSocketIO(String url, Map<String, String> headers, [Map<String, String>? queryParams]) {
     if (url.isEmpty) return;
     
     disconnect();
@@ -80,17 +84,40 @@ class SocketController extends GetxController {
     connectionError.value = '';
     
     try {
-      var ioUrl = url;
+      var ioUrl = url.split('?').first;
       if (!ioUrl.startsWith('http://') && !ioUrl.startsWith('https://')) {
         ioUrl = 'http://$ioUrl';
       }
 
-      _ioSocket = IO.io(ioUrl, IO.OptionBuilder()
+      // Sanitize and trim headers and query params
+      final safeHeaders = <String, String>{};
+      headers.forEach((key, value) {
+        safeHeaders[key.trim()] = value.trim();
+      });
+      
+      final safeQueryParams = <String, String>{};
+      if (queryParams != null) {
+        queryParams.forEach((key, value) {
+          safeQueryParams[key.trim()] = value.trim();
+        });
+      }
+
+      print('🚀 [SocketIO] Attempting connection to: $ioUrl');
+      print('🚀 [SocketIO] Payload -> auth (headers): $safeHeaders');
+      print('🚀 [SocketIO] Payload -> extraHeaders: $safeHeaders');
+      print('🚀 [SocketIO] Payload -> query: $safeQueryParams');
+
+      final options = IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
-          .setExtraHeaders(headers)
-          .build()
-      );
+          .setAuth(safeHeaders)
+          .setExtraHeaders(safeHeaders);
+          
+      if (safeQueryParams.isNotEmpty) {
+        options.setQuery(safeQueryParams);
+      }
+
+      _ioSocket = IO.io(ioUrl, options.build());
       
       _ioSocket!.onConnect((_) {
         isConnected.value = true;
@@ -98,6 +125,16 @@ class SocketController extends GetxController {
       });
       
       _ioSocket!.onConnectError((err) {
+        connectionError.value = err.toString();
+        disconnect();
+      });
+      
+      _ioSocket!.on('connect_timeout', (err) {
+        connectionError.value = 'timeout';
+        disconnect();
+      });
+      
+      _ioSocket!.onError((err) {
         connectionError.value = err.toString();
         disconnect();
       });

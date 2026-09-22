@@ -89,7 +89,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> createRequest(String collectionId, String name, {String? folderId, String method = 'GET', String requestKind = 'HTTP'}) async {
     final response = await _network.postRequest('/requests', data: {
-      'collection': collectionId,
+      'collectionId': collectionId,
       'name': name,
       'method': method,
       'requestKind': requestKind,

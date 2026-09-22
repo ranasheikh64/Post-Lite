@@ -5,12 +5,14 @@ class InteractiveTooltip extends StatefulWidget {
   final Widget child;
   final Widget popup;
   final Duration hoverDelay;
+  final bool enabled;
 
   const InteractiveTooltip({
     Key? key,
     required this.child,
     required this.popup,
     this.hoverDelay = const Duration(milliseconds: 200),
+    this.enabled = true,
   }) : super(key: key);
 
   @override
@@ -25,6 +27,7 @@ class _InteractiveTooltipState extends State<InteractiveTooltip> {
   Timer? _hideTimer;
 
   void _show() {
+    if (!widget.enabled) return;
     _hideTimer?.cancel();
     if (!_overlayController.isShowing) {
       _overlayController.show();
@@ -38,6 +41,18 @@ class _InteractiveTooltipState extends State<InteractiveTooltip> {
         _overlayController.hide();
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(InteractiveTooltip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled && _overlayController.isShowing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _overlayController.isShowing) {
+          _overlayController.hide();
+        }
+      });
+    }
   }
 
   @override

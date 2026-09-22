@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:postmanclone/app/data/providers/auth_service.dart';
 import 'package:postmanclone/app/routes/app_routes.dart';
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
+import 'package:dio/dio.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -13,6 +14,7 @@ class AuthController extends GetxController {
   final otpController = TextEditingController();
 
   final isLoading = false.obs;
+  final loginError = ''.obs;
   final currentUser = Rx<Map<String, dynamic>?>(null);
 
   @override
@@ -44,8 +46,9 @@ class AuthController extends GetxController {
   }
 
   Future<void> login() async {
+    loginError.value = '';
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
+      loginError.value = 'Please fill all fields';
       return;
     }
 
@@ -55,7 +58,15 @@ class AuthController extends GetxController {
       await fetchProfile();
       Get.offAllNamed(Routes.HOME);
     } catch (e) {
-      CustomSnackbar.show(title: 'Login Failed', message: e.toString(), isError: true);
+      if (e is DioException && e.response?.data != null) {
+        if (e.response!.data is Map && e.response!.data['message'] != null) {
+          loginError.value = e.response!.data['message'].toString();
+        } else {
+          loginError.value = 'Invalid credentials';
+        }
+      } else {
+        loginError.value = 'An error occurred. Please try again.';
+      }
     } finally {
       isLoading.value = false;
     }

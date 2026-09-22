@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
-
+import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
 
 class WebSocketBuilderView extends StatefulWidget {
   const WebSocketBuilderView({Key? key}) : super(key: key);
@@ -83,10 +83,13 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Obx(() => Text(
-                '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null ? "New WS Request" : reqController.url.value.split("/").last.isEmpty ? "Unnamed WS Request" : reqController.url.value.split("/").last}',
-                style: const TextStyle(color: Colors.grey, fontSize: 13),
-              )),
+              Expanded(
+                child: Obx(() => Text(
+                  '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null ? "New WS Request" : reqController.url.value.split("/").last.isEmpty ? "Unnamed WS Request" : reqController.url.value.split("/").last}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                )),
+              ),
               Row(
                 children: [
                   OutlinedButton.icon(
@@ -199,72 +202,121 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Top Box: Composer
+                      // Top Box: Tabs and Composer
                       SizedBox(
                         height: h,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[800]!),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                        child: DefaultTabController(
+                          length: 5,
+                          initialIndex: 3, // Default to Message
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                color: Colors.grey[900],
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('Message', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                  ],
-                                ),
+                              const TabBar(
+                                isScrollable: true,
+                                tabAlignment: TabAlignment.start,
+                                dividerColor: Colors.transparent,
+                                indicatorColor: Colors.orange,
+                                indicatorWeight: 2,
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Colors.grey,
+                                labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                tabs: [
+                                  Tab(text: 'Docs'),
+                                  Tab(text: 'Params'),
+                                  Tab(text: 'Headers'),
+                                  Tab(text: 'Message'),
+                                  Tab(text: 'Settings'),
+                                ],
                               ),
+                              const Divider(height: 1, color: Colors.white10),
                               Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Column(
-                                    children: [
-                                      Expanded(
-                                        child: TextField(
-                                          controller: messageController,
-                                          maxLines: null,
-                                          expands: true,
-                                          textAlignVertical: TextAlignVertical.top,
-                                          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                                          decoration: const InputDecoration(
-                                            hoverColor: Colors.transparent,
-                                            filled: false,
-                                            hintText: 'Enter message to send...',
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                          ),
+                                child: TabBarView(
+                                  children: [
+                                     DocsView(),
+                                    DynamicTableView(
+                                      items: reqController.queryParams,
+                                      title: 'Query Params',
+                                      onChanged: () => reqController.hasUnsavedChanges.value = true,
+                                    ),
+                                    DynamicTableView(
+                                      items: reqController.headers,
+                                      title: 'Headers',
+                                      onChanged: () => reqController.hasUnsavedChanges.value = true,
+                                    ),
+                                    // Message Composer
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey[800]!),
+                                        borderRadius: const BorderRadius.only(
+                                          bottomLeft: Radius.circular(8),
+                                          bottomRight: Radius.circular(8),
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
+                                      child: Column(
                                         children: [
-                                          Obx(() => ElevatedButton(
-                                            onPressed: socketController.isConnected.value
-                                                ? () {
-                                                    if (messageController.text.isNotEmpty) {
-                                                      socketController.sendMessage(messageController.text);
-                                                      messageController.clear();
-                                                    }
-                                                  }
-                                                : null,
-                                            style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                              backgroundColor: const Color(0xFF2563EB),
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            color: Colors.grey[900],
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Text('Payload', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                              ],
                                             ),
-                                            child: const Text('Send'),
-                                          )),
+                                          ),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(8.0),
+                                              child: Column(
+                                                children: [
+                                                  Expanded(
+                                                    child: TextField(
+                                                      controller: messageController,
+                                                      maxLines: null,
+                                                      expands: true,
+                                                      textAlignVertical: TextAlignVertical.top,
+                                                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                                                      decoration: const InputDecoration(
+                                                        hoverColor: Colors.transparent,
+                                                        filled: false,
+                                                        hintText: 'Enter message to send...',
+                                                        border: InputBorder.none,
+                                                        isDense: true,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.end,
+                                                    children: [
+                                                      Obx(() => ElevatedButton(
+                                                        onPressed: socketController.isConnected.value
+                                                            ? () {
+                                                                if (messageController.text.isNotEmpty) {
+                                                                  socketController.sendMessage(messageController.text);
+                                                                  messageController.clear();
+                                                                }
+                                                              }
+                                                            : null,
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                                          backgroundColor: const Color(0xFF2563EB),
+                                                          foregroundColor: Colors.white,
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                                        ),
+                                                        child: const Text('Send'),
+                                                      )),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const Center(child: Text('Settings coming soon', style: TextStyle(color: Colors.grey))),
+                                  ],
                                 ),
                               ),
                             ],

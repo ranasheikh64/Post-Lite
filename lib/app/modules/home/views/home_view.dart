@@ -414,6 +414,24 @@ class HomeView extends GetView<WorkspaceController> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              if (requests.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${requests.length}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.white54,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               Obx(() => workspaceController.userRoleInWorkspace.value == 'viewer' 
                 ? const SizedBox.shrink() 
@@ -454,22 +472,22 @@ class HomeView extends GetView<WorkspaceController> {
                     },
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.tune,
-                      size: 16,
-                      color: AppTheme.textSecondary,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    tooltip: 'Variables',
-                    splashRadius: 16,
-                    onPressed: () {
-                      showVariablesDialog(context, collection, workspaceController);
-                    },
-                  ),
-                  const SizedBox(width: 8),
                   if (depth == 0) ...[
+                    IconButton(
+                      icon: const Icon(
+                        Icons.tune,
+                        size: 16,
+                        color: AppTheme.textSecondary,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Variables',
+                      splashRadius: 16,
+                      onPressed: () {
+                        showVariablesDialog(context, collection, workspaceController);
+                      },
+                    ),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(
                         Icons.drive_file_move_outline,
