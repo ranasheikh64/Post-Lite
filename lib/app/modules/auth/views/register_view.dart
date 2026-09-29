@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:postmanclone/app/widgets/custom_button.dart';
 import 'package:postmanclone/app/widgets/custom_textfield.dart';
 import '../controllers/auth_controller.dart';
-import 'login_view.dart' show _LeftPanel, _GlassCard;
+import 'auth_widgets.dart';
 
 class RegisterView extends GetView<AuthController> {
   const RegisterView({super.key});
@@ -26,9 +26,9 @@ class RegisterView extends GetView<AuthController> {
         child: Row(
           children: [
             // ─── LEFT PANEL ───────────────────────────────────────────
-            Expanded(
+            const Expanded(
               flex: 5,
-              child: _LeftPanel(),
+              child: AuthLeftPanel(),
             ),
 
             // ─── RIGHT PANEL ──────────────────────────────────────────
@@ -36,8 +36,11 @@ class RegisterView extends GetView<AuthController> {
               flex: 4,
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-                  child: _GlassCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 32,
+                  ),
+                  child: AuthGlassCard(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -100,41 +103,17 @@ class RegisterView extends GetView<AuthController> {
                         const SizedBox(height: 28),
 
                         // Sign Up Button
-                        Obx(() => CustomButton(
-                              text: 'Create Account',
-                              isLoading: controller.isLoading.value,
-                              onPressed: () => controller.register(),
-                            )),
+                        Obx(
+                          () => CustomButton(
+                            text: 'Create Account',
+                            isLoading: controller.isLoading.value,
+                            onPressed: () => controller.register(),
+                          ),
+                        ),
                         const SizedBox(height: 20),
 
                         // Divider
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: Colors.white.withValues(alpha: 0.08),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                'OR',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  fontSize: 11,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: Colors.white.withValues(alpha: 0.08),
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildOrDivider(),
                         const SizedBox(height: 20),
 
                         // Login Link
@@ -151,7 +130,8 @@ class RegisterView extends GetView<AuthController> {
                                   TextSpan(
                                     text: 'Already have an account? ',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.5),
                                     ),
                                   ),
                                   const TextSpan(
@@ -175,6 +155,36 @@ class RegisterView extends GetView<AuthController> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOrDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'OR',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.3),
+              fontSize: 11,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+      ],
     );
   }
 }
