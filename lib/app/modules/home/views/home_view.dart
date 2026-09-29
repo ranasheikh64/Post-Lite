@@ -46,7 +46,17 @@ class HomeView extends GetView<WorkspaceController> {
             tooltip: 'Toggle Sidebar',
             onPressed: workspaceController.toggleSidebar,
           ),
-          title: const Text('Jronix Workspace'),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/icons/main_logo.png', height: 24),
+              const SizedBox(width: 8),
+              const Text(
+                'Jronix Post',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
           actions: [
             IconButton(icon: const Icon(Icons.sync), onPressed: () {}),
             IconButton(
