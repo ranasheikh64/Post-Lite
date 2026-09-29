@@ -23,17 +23,21 @@ class RegisterView extends GetView<AuthController> {
             ],
           ),
         ),
-        child: Row(
-          children: [
-            // ─── LEFT PANEL ───────────────────────────────────────────
-            const Expanded(
-              flex: 5,
-              child: AuthLeftPanel(),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 800;
+            return Row(
+              children: [
+                // ─── LEFT PANEL (hidden on small screens) ─────────────
+                if (isWide)
+                  const Expanded(
+                    flex: 5,
+                    child: AuthLeftPanel(),
+                  ),
 
-            // ─── RIGHT PANEL ──────────────────────────────────────────
-            Expanded(
-              flex: 4,
+                // ─── RIGHT PANEL ──────────────────────────────────────
+                Expanded(
+                  flex: isWide ? 4 : 1,
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(
@@ -152,7 +156,9 @@ class RegisterView extends GetView<AuthController> {
                 ),
               ),
             ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
