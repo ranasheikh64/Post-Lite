@@ -108,10 +108,13 @@ class RegisterView extends GetView<AuthController> {
 
                         // Sign Up Button
                         Obx(
-                          () => CustomButton(
-                            text: 'Create Account',
-                            isLoading: controller.isLoading.value,
-                            onPressed: () => controller.register(),
+                          () => Center(
+                            child: CustomButton(
+                              text: 'Create Account',
+                              isLoading: controller.isLoading.value,
+                              onPressed: () => controller.register(),
+                              width: 220,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),

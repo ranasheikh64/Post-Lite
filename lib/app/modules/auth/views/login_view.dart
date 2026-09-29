@@ -133,10 +133,13 @@ class LoginView extends GetView<AuthController> {
 
                         // Sign In Button
                         Obx(
-                          () => CustomButton(
-                            text: 'Sign In',
-                            isLoading: controller.isLoading.value,
-                            onPressed: () => controller.login(),
+                          () => Center(
+                            child: CustomButton(
+                              text: 'Sign In',
+                              isLoading: controller.isLoading.value,
+                              onPressed: () => controller.login(),
+                              width: 220,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),
