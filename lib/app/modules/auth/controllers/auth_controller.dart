@@ -68,7 +68,7 @@ class AuthController extends GetxController {
         loginError.value = 'An error occurred. Please try again.';
       }
     } finally {
-      isLoading.value = false;
+      if (!isClosed) isLoading.value = false;
     }
   }
 
@@ -86,7 +86,7 @@ class AuthController extends GetxController {
     } catch (e) {
       CustomSnackbar.show(title: 'Registration Failed', message: e.toString(), isError: true);
     } finally {
-      isLoading.value = false;
+      if (!isClosed) isLoading.value = false;
     }
   }
 
@@ -104,7 +104,7 @@ class AuthController extends GetxController {
     } catch (e) {
       CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
-      isLoading.value = false;
+      if (!isClosed) isLoading.value = false;
     }
   }
 
@@ -122,7 +122,7 @@ class AuthController extends GetxController {
     } catch (e) {
       CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
-      isLoading.value = false;
+      if (!isClosed) isLoading.value = false;
     }
   }
 
@@ -143,7 +143,7 @@ class AuthController extends GetxController {
     } catch (e) {
       CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
-      isLoading.value = false;
+      if (!isClosed) isLoading.value = false;
     }
   }
 }

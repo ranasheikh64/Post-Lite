@@ -3,8 +3,21 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const app = express();
-app.use(helmet());
-app.use(cors());
+
+// CORS config — allow all origins for Flutter web / GitHub Pages
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  credentials: false,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // handle preflight for all routes
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -28,5 +41,6 @@ app.use('/requests', require('./routes/request.routes'));
 // app.use('/environments', require('./routes/environment.routes'));
 // app.use('/history', require('./routes/history.routes'));
 app.use('/sync', require('./routes/sync.routes'));
+app.use('/proxy', require('./routes/proxy.routes'));
 
 module.exports = app;
