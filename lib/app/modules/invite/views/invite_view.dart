@@ -14,17 +14,16 @@ class InviteView extends GetView<InviteController> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CustomLoader(size: 60),
+            const CircularProgressIndicator(),
             const SizedBox(height: 24),
-            Obx(() => controller.isLoading.value
-                ? const Text(
-                    'Processing your invitation...',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                    ),
-                  )
-                : const SizedBox()),
+            Obx(
+              () => controller.isLoading.value
+                  ? const Text(
+                      'Processing your invitation...',
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    )
+                  : const SizedBox(),
+            ),
           ],
         ),
       ),

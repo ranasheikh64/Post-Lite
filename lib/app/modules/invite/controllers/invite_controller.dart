@@ -17,9 +17,13 @@ class InviteController extends GetxController {
 
   Future<void> _processInvite() async {
     final token = Get.parameters['token'];
-    
+
     if (token == null || token.isEmpty) {
-      CustomSnackbar.showError('Error', 'Invalid invitation link');
+      CustomSnackbar.show(
+        title: 'Error',
+        message: 'Invalid invitation link',
+        isError: true,
+      );
       Get.offAllNamed(Routes.LOGIN);
       return;
     }
@@ -31,10 +35,13 @@ class InviteController extends GetxController {
       // User is logged in, try to accept invite directly
       try {
         final response = await _apiService.acceptWorkspaceInvite(token);
-        CustomSnackbar.show(title: 'Success', response['message'] ?? 'Successfully joined workspace');
+        CustomSnackbar.show(
+          title: 'Success',
+          message: response['message'] ?? 'Successfully joined workspace',
+        );
         Get.offAllNamed(Routes.HOME);
       } catch (e) {
-        CustomSnackbar.showError('Failed to join', e.toString());
+        CustomSnackbar.show(title: 'Failed to join', message: e.toString());
         Get.offAllNamed(Routes.HOME);
       }
     } else {
