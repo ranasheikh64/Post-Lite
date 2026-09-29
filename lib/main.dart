@@ -23,17 +23,17 @@ void main() async {
     }
     FlutterError.presentError(details);
   };
-  
+
   // Initialize Hive for local storage
   await Hive.initFlutter();
-  
+
   // Check auth state for initial routing
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('accessToken');
   final refreshToken = prefs.getString('refreshToken');
-  
+
   String initialRoute = Routes.REGISTER;
-  
+
   if (token != null && token.isNotEmpty) {
     bool isExpired = JwtDecoder.isExpired(token);
     if (!isExpired) {
@@ -51,7 +51,7 @@ void main() async {
               '/auth/refresh',
               data: {'refreshToken': refreshToken},
             );
-            
+
             if (refreshResponse.statusCode == 200) {
               final newAccessToken = refreshResponse.data['accessToken'];
               await prefs.setString('accessToken', newAccessToken);
