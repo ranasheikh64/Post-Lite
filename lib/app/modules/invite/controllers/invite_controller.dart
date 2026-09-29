@@ -5,7 +5,7 @@ import '../../../data/providers/api_service.dart';
 import '../../../widgets/custom_snackbar.dart';
 
 class InviteController extends GetxController {
-  final ApiService _apiService = Get.find<ApiService>();
+  final ApiService _apiService = ApiService();
   var isLoading = true.obs;
 
   @override

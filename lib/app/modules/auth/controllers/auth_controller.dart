@@ -208,7 +208,7 @@ class AuthController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('pending_invite_token');
       if (token != null && token.isNotEmpty) {
-        final api = Get.find<ApiService>();
+        final api = ApiService();
         final res = await api.acceptWorkspaceInvite(token);
         CustomSnackbar.show(
           title: 'Team Joined',
