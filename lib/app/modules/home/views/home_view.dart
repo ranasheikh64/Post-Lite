@@ -49,11 +49,15 @@ class HomeView extends GetView<WorkspaceController> {
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset('assets/icons/main_logo.png', height: 24),
-              const SizedBox(width: 8),
+              Image.asset('assets/icons/main_logo.png', height: 36),
+              const SizedBox(width: 12),
               const Text(
                 'Jronix Post',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  letterSpacing: 0.5,
+                ),
               ),
             ],
           ),
