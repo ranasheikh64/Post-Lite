@@ -619,25 +619,45 @@ class RequestBuilderController extends GetxController {
         requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
       }
       
-      final response = await dio.request(
-        resolvedUrl,
-        data: requestBody,
-        options: Options(
-          method: method.value,
-          headers: requestHeaders,
-        ),
+      // Route all requests through the proxy to avoid CORS in Web
+      final proxyUrl = 'https://post-lite-backend.onrender.com/proxy';
+      final isFormData = requestBody is FormData;
+      
+      dynamic proxyData;
+
+      if (isFormData) {
+        final fd = requestBody as FormData;
+        fd.fields.add(MapEntry('Proxy-Method', method.value));
+        fd.fields.add(MapEntry('Proxy-Url', resolvedUrl));
+        fd.fields.add(MapEntry('Proxy-Headers', jsonEncode(requestHeaders)));
+        proxyData = fd;
+      } else {
+        proxyData = {
+          'method': method.value,
+          'url': resolvedUrl,
+          'headers': requestHeaders,
+          'body': requestBody,
+        };
+      }
+
+      final proxyResponse = await dio.post(
+        proxyUrl,
+        data: proxyData,
       );
       
       stopwatch.stop();
       responseTime.value = stopwatch.elapsedMilliseconds;
-      responseStatus.value = response.statusCode ?? 200;
       
-      final dataString = response.data.toString();
+      // The proxy returns 200 always, with the real status inside proxyResponse.data['status']
+      responseStatus.value = proxyResponse.data['status'] ?? 200;
+      
+      final actualData = proxyResponse.data['data'];
+      final dataString = actualData != null ? (actualData is String ? actualData : jsonEncode(actualData)) : '';
       responseSize.value = dataString.length;
       
       try {
-        if (response.data is Map || response.data is List) {
-          responseData.value = const JsonEncoder.withIndent('  ').convert(response.data);
+        if (actualData is Map || actualData is List) {
+          responseData.value = const JsonEncoder.withIndent('  ').convert(actualData);
         } else {
           responseData.value = dataString;
         }
