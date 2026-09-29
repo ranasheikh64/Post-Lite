@@ -29,13 +29,15 @@ class NetworkCaller {
             name: 'API Request',
           );
           log('| Headers: ${options.headers}', name: 'API Request');
-          if (options.queryParameters.isNotEmpty)
+          if (options.queryParameters.isNotEmpty) {
             log(
               '| Query Params: ${options.queryParameters}',
               name: 'API Request',
             );
-          if (options.data != null)
+          }
+          if (options.data != null) {
             log('| Body: ${options.data}', name: 'API Request');
+          }
           log(
             '└------------------------------------------------------------------',
             name: 'API Request',
@@ -76,8 +78,9 @@ class NetworkCaller {
           );
           log('| Status: ${error.response?.statusCode}', name: 'API Error');
           log('| Message: ${error.message}', name: 'API Error');
-          if (error.response?.data != null)
+          if (error.response?.data != null) {
             log('| Response: ${error.response?.data}', name: 'API Error');
+          }
           log(
             '└------------------------------------------------------------------',
             name: 'API Error',

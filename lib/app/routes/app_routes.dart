@@ -9,4 +9,5 @@ abstract class Routes {
   static const FORGOT_PASSWORD = '/forgot-password';
   static const RESET_PASSWORD = '/reset-password';
   static const SETTINGS = '/settings';
+  static const INVITE = '/invite';
 }

@@ -19,6 +19,21 @@ class ApiService {
     await _network.deleteRequest('/workspaces/$id');
   }
 
+  Future<Map<String, dynamic>> inviteMember(String workspaceId, String email, String role) async {
+    final response = await _network.postRequest('/workspaces/$workspaceId/invite', data: {
+      'email': email,
+      'role': role,
+    });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> acceptWorkspaceInvite(String token) async {
+    final response = await _network.postRequest('/workspaces/invite/$token/accept', data: {
+      'token': token,
+    });
+    return response.data;
+  }
+
   Future<Map<String, dynamic>> addWorkspaceMember(String workspaceId, String email, String role) async {
     final response = await _network.postRequest('/workspaces/$workspaceId/members', data: {'email': email, 'role': role});
     return response.data;

@@ -4,6 +4,8 @@ import 'package:postmanclone/app/data/providers/auth_service.dart';
 import 'package:postmanclone/app/routes/app_routes.dart';
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:postmanclone/app/data/providers/api_service.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -56,6 +58,7 @@ class AuthController extends GetxController {
       isLoading.value = true;
       await _authService.login(emailController.text, passwordController.text);
       await fetchProfile();
+      await _checkAndAcceptInvite();
       Get.offAllNamed(Routes.HOME);
     } catch (e) {
       if (e is DioException && e.response?.data != null) {
@@ -73,18 +76,39 @@ class AuthController extends GetxController {
   }
 
   Future<void> register() async {
-    if (nameController.text.isEmpty || emailController.text.isEmpty || passwordController.text.isEmpty) {
-      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
+    if (nameController.text.isEmpty ||
+        emailController.text.isEmpty ||
+        passwordController.text.isEmpty) {
+      CustomSnackbar.show(
+        title: 'Error',
+        message: 'Please fill all fields',
+        isError: true,
+      );
       return;
     }
 
     try {
       isLoading.value = true;
-      await _authService.register(nameController.text, emailController.text, passwordController.text);
-      CustomSnackbar.show(title: 'Success', message: 'Registration successful. Please login.');
-      Get.offNamed(Routes.LOGIN);
+      await _authService.register(
+        nameController.text,
+        emailController.text,
+        passwordController.text,
+      );
+      // Auto-login after registration to accept invite if exists
+      await _authService.login(emailController.text, passwordController.text);
+      await fetchProfile();
+      await _checkAndAcceptInvite();
+      CustomSnackbar.show(
+        title: 'Success',
+        message: 'Registration successful.',
+      );
+      Get.offAllNamed(Routes.HOME);
     } catch (e) {
-      CustomSnackbar.show(title: 'Registration Failed', message: e.toString(), isError: true);
+      CustomSnackbar.show(
+        title: 'Registration Failed',
+        message: e.toString(),
+        isError: true,
+      );
     } finally {
       if (!isClosed) isLoading.value = false;
     }
@@ -92,7 +116,11 @@ class AuthController extends GetxController {
 
   Future<void> forgotPassword() async {
     if (emailController.text.isEmpty) {
-      CustomSnackbar.show(title: 'Error', message: 'Please enter your email', isError: true);
+      CustomSnackbar.show(
+        title: 'Error',
+        message: 'Please enter your email',
+        isError: true,
+      );
       return;
     }
 
@@ -102,25 +130,46 @@ class AuthController extends GetxController {
       CustomSnackbar.show(title: 'Success', message: 'OTP sent to your email');
       Get.toNamed(Routes.RESET_PASSWORD);
     } catch (e) {
-      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
+      CustomSnackbar.show(
+        title: 'Failed',
+        message: e.toString(),
+        isError: true,
+      );
     } finally {
       if (!isClosed) isLoading.value = false;
     }
   }
 
   Future<void> resetPassword() async {
-    if (emailController.text.isEmpty || otpController.text.isEmpty || passwordController.text.isEmpty) {
-      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
+    if (emailController.text.isEmpty ||
+        otpController.text.isEmpty ||
+        passwordController.text.isEmpty) {
+      CustomSnackbar.show(
+        title: 'Error',
+        message: 'Please fill all fields',
+        isError: true,
+      );
       return;
     }
 
     try {
       isLoading.value = true;
-      await _authService.resetPassword(emailController.text, otpController.text, passwordController.text);
-      CustomSnackbar.show(title: 'Success', message: 'Password reset successfully');
+      await _authService.resetPassword(
+        emailController.text,
+        otpController.text,
+        passwordController.text,
+      );
+      CustomSnackbar.show(
+        title: 'Success',
+        message: 'Password reset successfully',
+      );
       Get.offAllNamed(Routes.LOGIN);
     } catch (e) {
-      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
+      CustomSnackbar.show(
+        title: 'Failed',
+        message: e.toString(),
+        isError: true,
+      );
     } finally {
       if (!isClosed) isLoading.value = false;
     }
@@ -139,11 +188,38 @@ class AuthController extends GetxController {
       await _authService.logout();
       currentUser.value = null;
       Get.offAllNamed(Routes.LOGIN);
-      CustomSnackbar.show(title: 'Success', message: 'Account deleted successfully');
+      CustomSnackbar.show(
+        title: 'Success',
+        message: 'Account deleted successfully',
+      );
     } catch (e) {
-      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
+      CustomSnackbar.show(
+        title: 'Failed',
+        message: e.toString(),
+        isError: true,
+      );
     } finally {
       if (!isClosed) isLoading.value = false;
+    }
+  }
+
+  Future<void> _checkAndAcceptInvite() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('pending_invite_token');
+      if (token != null && token.isNotEmpty) {
+        final api = Get.find<ApiService>();
+        final res = await api.acceptWorkspaceInvite(token);
+        CustomSnackbar.show(
+          title: 'Team Joined',
+          message: res['message'] ?? 'Successfully joined workspace',
+          isError: false,
+        );
+        await prefs.remove('pending_invite_token');
+      }
+    } catch (e) {
+      // It's okay if it fails, the token might be expired or already used
+      debugPrint('Invite accept error: $e');
     }
   }
 }

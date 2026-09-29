@@ -408,12 +408,12 @@ class WorkspaceController extends GetxController {
 
   Future<void> addWorkspaceMember(String workspaceId, String email, String role) async {
     try {
-      await _apiService.addWorkspaceMember(workspaceId, email, role);
-      await fetchWorkspaces();
-      CustomSnackbar.show(title: 'Success', message: 'Member invited');
+      await _apiService.inviteMember(workspaceId, email, role);
+      // Removed fetchWorkspaces here because invitation is sent, member is not instantly added.
+      CustomSnackbar.show(title: 'Success', message: 'Invitation email sent!');
     } catch (e, stack) {
-      log('Failed to add member', error: e, stackTrace: stack, name: 'WorkspaceController');
-      final msg = e is DioException ? e.response?.data['message'] ?? 'Failed to add member' : 'Failed to add member';
+      log('Failed to send invite', error: e, stackTrace: stack, name: 'WorkspaceController');
+      final msg = e is DioException ? e.response?.data['message'] ?? 'Failed to send invite' : 'Failed to send invite';
       CustomSnackbar.show(title: 'Error', message: msg, isError: true);
     }
   }

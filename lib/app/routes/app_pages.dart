@@ -10,6 +10,8 @@ import '../modules/home/views/home_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/settings/views/settings_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
+import '../modules/invite/views/invite_view.dart';
+import '../modules/invite/bindings/invite_binding.dart';
 
 class AppPages {
   static final pages = [
@@ -53,6 +55,13 @@ class AppPages {
       name: Routes.SETTINGS,
       page: () => SettingsView(),
       binding: SettingsBinding(),
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: Routes.INVITE,
+      page: () => const InviteView(),
+      binding: InviteBinding(),
       transition: Transition.fadeIn,
       transitionDuration: const Duration(milliseconds: 300),
     ),
