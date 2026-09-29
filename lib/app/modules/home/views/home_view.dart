@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import '../../request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/core/theme/app_theme.dart';
 import 'package:postmanclone/app/routes/app_routes.dart';
@@ -25,8 +26,21 @@ class HomeView extends GetView<WorkspaceController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return DropTarget(
+      onDragDone: (detail) async {
+        for (final file in detail.files) {
+          if (file.name.toLowerCase().endsWith('.json')) {
+            try {
+              final content = await file.readAsString();
+              await workspaceController.importPostmanCollection(content);
+            } catch (e) {
+              debugPrint('Failed to read dropped file: $e');
+            }
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.view_sidebar_outlined),
           tooltip: 'Toggle Sidebar',
