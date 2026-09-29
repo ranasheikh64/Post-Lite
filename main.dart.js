@@ -107367,7 +107367,6 @@ case 3:q=2
 i=p.pop()
 l=A.a2(i)
 k=A.au(i)
-A.c8(!0,"Failed to fetch collections","Error")
 o.push(5)
 s=4
 break
