@@ -45,15 +45,15 @@ class AuthLeftPanel extends StatelessWidget {
                   children: [
                     Image.asset(
                       'assets/icons/main_logo.png',
-                      width: 40,
-                      height: 40,
+                      width: 56,
+                      height: 56,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     const Text(
-                      'Jronix',
+                      'Jronix Post',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 26,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.3,
                       ),
