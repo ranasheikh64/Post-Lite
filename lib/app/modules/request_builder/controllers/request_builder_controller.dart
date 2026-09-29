@@ -626,7 +626,7 @@ class RequestBuilderController extends GetxController {
       dynamic proxyData;
 
       if (isFormData) {
-        final fd = requestBody as FormData;
+        final fd = requestBody;
         fd.fields.add(MapEntry('Proxy-Method', method.value));
         fd.fields.add(MapEntry('Proxy-Url', resolvedUrl));
         fd.fields.add(MapEntry('Proxy-Headers', jsonEncode(requestHeaders)));
