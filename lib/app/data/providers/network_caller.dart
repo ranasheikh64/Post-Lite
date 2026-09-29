@@ -10,7 +10,7 @@ class NetworkCaller {
 
   NetworkCaller._internal() {
     _dio = Dio(BaseOptions(
-      baseUrl: 'http://10.0.60.243:4000',
+      baseUrl: 'https://post-lite-backend.onrender.com',
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
     ));
@@ -53,7 +53,7 @@ class NetworkCaller {
           
           if (refreshToken != null) {
             try {
-              final refreshDio = Dio(BaseOptions(baseUrl: 'http://10.0.60.243:4000/auth'));
+              final refreshDio = Dio(BaseOptions(baseUrl: 'https://post-lite-backend.onrender.com/auth'));
               final refreshResponse = await refreshDio.post('/refresh', data: {
                 'refreshToken': refreshToken,
               });
