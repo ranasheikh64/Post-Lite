@@ -103508,7 +103508,7 @@ break
 case 1:return A.t(q,r)}})
 return A.u($async$ve,r)}}
 A.ap0.prototype={
-ade(){var s=A.acA(A.aR0("http://10.0.60.243:4000",B.pR,B.pR))
+ade(){var s=A.acA(A.aR0("https://post-lite-backend.onrender.com",B.pR,B.pR))
 this.a=s
 s=s.a2g$
 s.C(s,new A.SC(new A.ap1(),new A.ap2(),new A.ap3(),null,null,null))},
@@ -103666,7 +103666,7 @@ m=A.cQ(J.X(n.a,"refreshToken"))
 s=m!=null?6:7
 break
 case 6:p=9
-l=A.acA(A.aR0("http://10.0.60.243:4000/auth",null,null))
+l=A.acA(A.aR0("https://post-lite-backend.onrender.com/auth",null,null))
 g=t.N
 f=t.z
 s=12
