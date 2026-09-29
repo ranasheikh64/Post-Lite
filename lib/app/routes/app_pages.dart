@@ -12,52 +12,49 @@ import '../modules/settings/views/settings_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
 
 class AppPages {
-  // Default smooth transition used across the app
-  static const _transition = Transition.fadeIn;
-  static const _duration = Duration(milliseconds: 350);
-
   static final pages = [
     GetPage(
       name: Routes.LOGIN,
       page: () => const LoginView(),
       binding: AuthBinding(),
-      transition: _transition,
-      transitionDuration: _duration,
+      // fadeIn avoids the keyboard state assertion bug on desktop
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
       name: Routes.REGISTER,
       page: () => const RegisterView(),
       binding: AuthBinding(),
-      transition: Transition.rightToLeftWithFade,
-      transitionDuration: _duration,
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
       name: Routes.FORGOT_PASSWORD,
       page: () => ForgotPasswordView(),
       binding: AuthBinding(),
-      transition: Transition.rightToLeftWithFade,
-      transitionDuration: _duration,
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
       name: Routes.RESET_PASSWORD,
       page: () => ResetPasswordView(),
       binding: AuthBinding(),
-      transition: Transition.rightToLeftWithFade,
-      transitionDuration: _duration,
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
       name: Routes.HOME,
       page: () => HomeView(),
       binding: HomeBinding(),
       transition: Transition.fadeIn,
-      transitionDuration: const Duration(milliseconds: 450),
+      transitionDuration: const Duration(milliseconds: 400),
     ),
     GetPage(
       name: Routes.SETTINGS,
       page: () => SettingsView(),
       binding: SettingsBinding(),
-      transition: Transition.rightToLeftWithFade,
-      transitionDuration: _duration,
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
     ),
   ];
 }

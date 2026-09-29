@@ -10,6 +10,18 @@ import 'app/core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Suppress the Flutter keyboard state assertion bug that occurs
+  // during page transitions on desktop (Escape key duplicate event).
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final msg = details.exceptionAsString();
+    if (msg.contains('_pressedKeys.containsKey') ||
+        msg.contains('KeyDownEvent is dispatched')) {
+      // Known Flutter desktop keyboard sync bug — safe to ignore
+      return;
+    }
+    FlutterError.presentError(details);
+  };
   
   // Initialize Hive for local storage
   await Hive.initFlutter();
@@ -38,6 +50,8 @@ void main() async {
       initialRoute: initialRoute,
       getPages: AppPages.pages,
       debugShowCheckedModeBanner: false,
+      defaultTransition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 350),
     ),
   );
 }
