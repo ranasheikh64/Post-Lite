@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:dio/dio.dart';
 
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
@@ -29,17 +30,49 @@ void main() async {
   // Check auth state for initial routing
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('accessToken');
+  final refreshToken = prefs.getString('refreshToken');
   
-  String initialRoute = Routes.LOGIN;
+  String initialRoute = Routes.REGISTER;
   
   if (token != null && token.isNotEmpty) {
     bool isExpired = JwtDecoder.isExpired(token);
     if (!isExpired) {
       initialRoute = Routes.HOME;
     } else {
-      // Clear expired tokens
-      await prefs.remove('accessToken');
-      await prefs.remove('refreshToken');
+      // Access token is expired, check refresh token
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        bool isRefreshExpired = JwtDecoder.isExpired(refreshToken);
+        if (!isRefreshExpired) {
+          try {
+            final dio = Dio(
+              BaseOptions(baseUrl: 'https://post-lite-backend.vercel.app'),
+            );
+            final refreshResponse = await dio.post(
+              '/auth/refresh',
+              data: {'refreshToken': refreshToken},
+            );
+            
+            if (refreshResponse.statusCode == 200) {
+              final newAccessToken = refreshResponse.data['accessToken'];
+              await prefs.setString('accessToken', newAccessToken);
+              initialRoute = Routes.HOME;
+            } else {
+              initialRoute = Routes.LOGIN;
+            }
+          } catch (e) {
+            await prefs.remove('accessToken');
+            await prefs.remove('refreshToken');
+            initialRoute = Routes.LOGIN;
+          }
+        } else {
+          await prefs.remove('accessToken');
+          await prefs.remove('refreshToken');
+          initialRoute = Routes.LOGIN;
+        }
+      } else {
+        await prefs.remove('accessToken');
+        initialRoute = Routes.LOGIN;
+      }
     }
   }
 

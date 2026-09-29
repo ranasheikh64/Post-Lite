@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer';
+import 'package:get/get.dart';
+import '../../routes/app_routes.dart';
 
 class NetworkCaller {
   static final NetworkCaller _instance = NetworkCaller._internal();
@@ -94,11 +96,11 @@ class NetworkCaller {
               try {
                 final refreshDio = Dio(
                   BaseOptions(
-                    baseUrl: 'https://post-lite-backend.onrender.com/auth',
+                    baseUrl: error.requestOptions.baseUrl,
                   ),
                 );
                 final refreshResponse = await refreshDio.post(
-                  '/refresh',
+                  '/auth/refresh',
                   data: {'refreshToken': refreshToken},
                 );
 
@@ -114,7 +116,13 @@ class NetworkCaller {
               } catch (e) {
                 await prefs.remove('accessToken');
                 await prefs.remove('refreshToken');
+                // Use a global key or GetX to redirect
+                Get.offAllNamed(Routes.LOGIN);
               }
+            } else {
+              await prefs.remove('accessToken');
+              await prefs.remove('refreshToken');
+              Get.offAllNamed(Routes.LOGIN);
             }
           }
           return handler.next(error);
