@@ -96,15 +96,14 @@ class AuthLeftPanel extends StatelessWidget {
                   ],
                 ),
 
-                // Illustration
+                // Illustration — fills remaining space edge to edge
                 Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 32, bottom: 16),
-                      child: Image.asset(
-                        'assets/icons/login_screen_image.png',
-                        fit: BoxFit.contain,
-                      ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: Image.asset(
+                      'assets/icons/login_screen_image.png',
+                      fit: BoxFit.fitHeight,
+                      alignment: Alignment.bottomCenter,
                     ),
                   ),
                 ),
