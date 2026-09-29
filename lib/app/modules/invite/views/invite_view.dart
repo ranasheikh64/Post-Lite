@@ -70,13 +70,10 @@ class InviteView extends StatelessWidget {
               const SizedBox(height: 8),
               const Text(
                 'Workspace Invitation',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white54,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.white54),
               ),
               const SizedBox(height: 40),
-              const CustomLoader(size: 40),
+              CircularProgressIndicator(),
               const SizedBox(height: 24),
               Obx(
                 () => controller.isLoading.value
