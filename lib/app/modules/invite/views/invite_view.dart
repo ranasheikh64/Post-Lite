@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/invite_controller.dart';
-import '../../../widgets/custom_loader.dart';
 
 class InviteView extends GetView<InviteController> {
   const InviteView({super.key});

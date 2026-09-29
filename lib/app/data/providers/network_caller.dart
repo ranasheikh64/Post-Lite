@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide Response;
 import '../../routes/app_routes.dart';
 
 class NetworkCaller {
