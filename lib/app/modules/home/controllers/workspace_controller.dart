@@ -638,7 +638,8 @@ class WorkspaceController extends GetxController {
 
   Future<void> exportCollection(dynamic collection) async {
     try {
-      final collectionData = jsonEncode(collection);
+      final postmanData = _convertToPostmanFormat(collection);
+      final collectionData = jsonEncode(postmanData);
       final fileName = '${collection['name']?.replaceAll(' ', '_') ?? 'Collection'}_export.json';
       
       final bytes = Uint8List.fromList(utf8.encode(collectionData));
@@ -663,6 +664,96 @@ class WorkspaceController extends GetxController {
         isError: true,
       );
     }
+  }
+
+  Map<String, dynamic> _convertToPostmanFormat(dynamic collection) {
+    return {
+      'info': {
+        'name': collection['name'] ?? 'Exported Collection',
+        'schema': 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+      },
+      'item': _buildPostmanItems(collection),
+    };
+  }
+
+  List<Map<String, dynamic>> _buildPostmanItems(dynamic folderOrCollection) {
+    final List<Map<String, dynamic>> items = [];
+
+    if (folderOrCollection['folders'] != null) {
+      for (var folder in folderOrCollection['folders']) {
+        items.add({
+          'name': folder['name'] ?? 'Folder',
+          'item': _buildPostmanItems(folder),
+        });
+      }
+    }
+
+    if (folderOrCollection['requests'] != null) {
+      for (var req in folderOrCollection['requests']) {
+        items.add({
+          'name': req['name'] ?? 'Request',
+          'request': _buildPostmanRequest(req),
+        });
+      }
+    }
+
+    return items;
+  }
+
+  Map<String, dynamic> _buildPostmanRequest(dynamic req) {
+    final String? rawBodyMode = req['bodyType'];
+    final bodyMode = rawBodyMode == 'form-data' ? 'formdata' 
+                   : (rawBodyMode == 'urlencoded' ? 'urlencoded' : (rawBodyMode == 'none' ? 'none' : 'raw'));
+    
+    Map<String, dynamic> bodyObj = {
+      'mode': bodyMode,
+    };
+
+    if (bodyMode == 'raw') {
+      if (req['body'] is Map) {
+        bodyObj['raw'] = req['body']['raw'] ?? '';
+      } else {
+        bodyObj['raw'] = req['body']?.toString() ?? '';
+      }
+      bodyObj['options'] = {
+        'raw': {
+          'language': req['bodyFormat'] == 'json' ? 'json' : 'text'
+        }
+      };
+    } else if (bodyMode == 'formdata') {
+      if (req['body'] is Map && req['body']['formData'] != null) {
+        bodyObj['formdata'] = req['body']['formData'];
+      } else if (req['body'] is List) {
+        bodyObj['formdata'] = req['body'];
+      }
+    } else if (bodyMode == 'urlencoded') {
+      if (req['body'] is Map && req['body']['urlEncodedData'] != null) {
+        bodyObj['urlencoded'] = req['body']['urlEncodedData'];
+      } else if (req['body'] is List) {
+        bodyObj['urlencoded'] = req['body'];
+      }
+    }
+
+    return {
+      'method': req['method'] ?? 'GET',
+      'header': (req['headers'] as List?)?.map((h) => {
+        'key': h['key'] ?? '',
+        'value': h['value'] ?? '',
+        'description': h['description'] ?? '',
+        'disabled': h['enabled'] == false,
+      }).toList() ?? [],
+      'url': {
+        'raw': req['url'] ?? '',
+        'query': (req['queryParams'] as List?)?.map((q) => {
+          'key': q['key'] ?? '',
+          'value': q['value'] ?? '',
+          'description': q['description'] ?? '',
+          'disabled': q['enabled'] == false,
+        }).toList() ?? []
+      },
+      'body': bodyObj,
+      'description': req['docs'] ?? '',
+    };
   }
 
   Future<void> deleteCollection(String id) async {
