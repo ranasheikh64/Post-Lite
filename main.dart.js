@@ -106595,7 +106595,7 @@ break
 case 1:return A.t(q,r)}})
 return A.u($async$vC,r)}}
 A.ars.prototype={
-af2(){var s=A.S5(A.abf("http://localhost:4000",B.lh,B.lh))
+af2(){var s=A.S5(A.abf("https://post-lite-backend.vercel.app",B.lh,B.lh))
 this.a=s
 s=s.k2$
 s.C(s,new A.U_(new A.art(),new A.aru(),new A.arv(),null,null,null))},
