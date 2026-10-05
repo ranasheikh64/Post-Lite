@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:postmanclone/app/widgets/custom_json_viewer.dart';
 import 'package:get/get.dart';
 import 'package:postmanclone/app/core/theme/app_theme.dart';
+import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 import '../controllers/request_builder_controller.dart';
 import 'websocket_builder_view.dart';
 import 'socketio_builder_view.dart';
 import '../../../widgets/interactive_tooltip.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:postmanclone/app/widgets/variable_autocomplete.dart';
+import '../widgets/code_snippet_dialog.dart';
 
 class RequestBuilderView extends GetView<RequestBuilderController> {
   const RequestBuilderView({Key? key}) : super(key: key);
@@ -79,6 +82,15 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                         ),
                         minimumSize: const Size(0, 32),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Code Snippet',
+                      onPressed: () {
+                        showCodeSnippetSidePanel(context, controller);
+                      },
+                      icon: const Icon(Icons.code, size: 18),
+                      color: Colors.grey[400],
                     ),
                   ],
                 ),
@@ -488,11 +500,24 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                                                       .shrinkWrap,
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            onPressed: () {
+                                              Clipboard.setData(ClipboardData(text: controller.responseData.value));
+                                              CustomSnackbar.show(title: 'Copied', message: 'Response copied to clipboard');
+                                            },
+                                            icon: const Icon(Icons.copy, size: 14),
+                                            tooltip: 'Copy Response',
+                                            color: Colors.grey,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            splashRadius: 16,
+                                          ),
                                         ],
                                       ),
                                     ),
                                     Expanded(
-                                      child: SingleChildScrollView(
+                                      child: Container(
                                         padding: const EdgeInsets.all(16),
                                         child: _buildResponseView(
                                           controller.responseData.value,
@@ -553,18 +578,16 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
     if (data.trim().startsWith('{') || data.trim().startsWith('[')) {
       try {
         final decoded = jsonDecode(data);
-        final prettyString = const JsonEncoder.withIndent('    ').convert(decoded);
-        return SelectableText.rich(
-          _highlightJson(prettyString),
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
-        );
+        return CustomJsonViewer(jsonObj: decoded);
       } catch (_) {
         // Fallback to text if parsing fails
       }
     }
-    return SelectableText(
-      data,
-      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+    return SingleChildScrollView(
+      child: SelectableText(
+        data,
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+      ),
     );
   }
 
