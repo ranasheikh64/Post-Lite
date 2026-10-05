@@ -10,10 +10,12 @@ class NetworkCaller {
 
   late Dio _dio;
 
+  String get baseUrl => _dio.options.baseUrl;
+
   NetworkCaller._internal() {
     _dio = Dio(
       BaseOptions(
-        baseUrl: 'https://post-lite-backend.vercel.app',
+        // baseUrl: 'https://post-lite-backend.vercel.app',
         // baseUrl: 'http://localhost:4000',
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),

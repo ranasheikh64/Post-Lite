@@ -10,6 +10,7 @@ void showTeamSettingsDialog(BuildContext context, WorkspaceController workspaceC
 
     final emailController = TextEditingController();
     String selectedRole = 'viewer';
+    bool isInviting = false;
 
     showDialog(
       context: context,
@@ -50,21 +51,23 @@ void showTeamSettingsDialog(BuildContext context, WorkspaceController workspaceC
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
-                        onPressed: () async {
+                        onPressed: isInviting ? null : () async {
                           if (emailController.text.isNotEmpty) {
+                            setState(() => isInviting = true);
                             await workspaceController.addWorkspaceMember(wsId, emailController.text, selectedRole);
                             emailController.clear();
                             // Refresh ws reference
                             final updatedWs = workspaceController.workspaces.firstWhere((w) => w['_id'] == wsId, orElse: () => null);
                             if (updatedWs != null) {
-                              setState(() {
-                                members.clear();
-                                members.addAll(updatedWs['members']);
-                              });
+                              members.clear();
+                              members.addAll(updatedWs['members']);
                             }
+                            setState(() => isInviting = false);
                           }
                         },
-                        child: const Text('Invite'),
+                        child: isInviting 
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Invite'),
                       )
                     ],
                   ),
