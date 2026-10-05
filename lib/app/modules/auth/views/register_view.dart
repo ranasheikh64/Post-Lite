@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:postmanclone/app/routes/app_routes.dart';
 import 'package:postmanclone/app/widgets/custom_button.dart';
 import 'package:postmanclone/app/widgets/custom_textfield.dart';
 import '../controllers/auth_controller.dart';
@@ -126,7 +127,7 @@ class RegisterView extends GetView<AuthController> {
                         // Login Link
                         Center(
                           child: TextButton(
-                            onPressed: () => Get.back(),
+                            onPressed: () => Get.toNamed(Routes.LOGIN),
                             style: TextButton.styleFrom(
                               foregroundColor: const Color(0xFF4FC3F7),
                             ),
