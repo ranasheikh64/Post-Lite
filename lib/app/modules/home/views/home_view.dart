@@ -634,10 +634,25 @@ class HomeView extends GetView<WorkspaceController> {
                                 },
                               ),
                               const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.file_download_outlined,
+                                  size: 16,
+                                  color: AppTheme.textSecondary,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Export Collection',
+                                splashRadius: 16,
+                                onPressed: () {
+                                  workspaceController.exportCollection(collection);
+                                },
+                              ),
+                              const SizedBox(width: 8),
                             ],
                             IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
+                                icon: const Icon(
+                                  Icons.delete_outline,
                                 size: 16,
                                 color: AppTheme.textSecondary,
                               ),

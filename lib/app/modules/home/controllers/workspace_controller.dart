@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:postmanclone/app/data/providers/api_service.dart';
 import 'dart:developer';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
@@ -629,6 +631,35 @@ class WorkspaceController extends GetxController {
       CustomSnackbar.show(
         title: 'Error',
         message: 'Failed to create folder',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> exportCollection(dynamic collection) async {
+    try {
+      final collectionData = jsonEncode(collection);
+      final fileName = '${collection['name']?.replaceAll(' ', '_') ?? 'Collection'}_export.json';
+      
+      final bytes = Uint8List.fromList(utf8.encode(collectionData));
+
+      Uri? outputFile = await FilePicker.saveFile(
+        dialogTitle: 'Export Collection',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: bytes,
+        mimeType: 'application/json',
+      );
+
+      if (outputFile != null) {
+        CustomSnackbar.show(title: 'Success', message: 'Collection exported successfully.');
+      }
+    } catch (e) {
+      log('Failed to export collection', error: e, name: 'WorkspaceController');
+      CustomSnackbar.show(
+        title: 'Export Failed',
+        message: 'Could not export collection.',
         isError: true,
       );
     }
