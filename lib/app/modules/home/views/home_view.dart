@@ -87,7 +87,7 @@ class HomeView extends GetView<WorkspaceController> {
                     minWidth: workspaceController.sidebarWidth.value,
                     maxWidth: workspaceController.sidebarWidth.value,
                     alignment: Alignment.topLeft,
-                    child: Container(
+                    child: Material(
                       color: Theme.of(context).cardColor,
                       child: Column(
                         children: [

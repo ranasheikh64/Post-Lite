@@ -7,12 +7,14 @@ class SocketMessage {
   final bool isSent;
   final DateTime timestamp;
   final String? eventName; // For Socket.IO
+  final bool isSystem;
 
   SocketMessage({
     required this.content,
     required this.isSent,
     required this.timestamp,
     this.eventName,
+    this.isSystem = false,
   });
 }
 
@@ -110,6 +112,7 @@ class SocketController extends GetxController {
       final options = IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
+          .enableForceNew()
           .setAuth(safeHeaders)
           .setExtraHeaders(safeHeaders);
           
@@ -122,10 +125,22 @@ class SocketController extends GetxController {
       _ioSocket!.onConnect((_) {
         isConnected.value = true;
         isConnecting.value = false;
+        messages.add(SocketMessage(
+          content: 'Connected to $ioUrl',
+          isSent: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ));
       });
       
       _ioSocket!.onConnectError((err) {
         connectionError.value = err.toString();
+        messages.add(SocketMessage(
+          content: 'ConnectError: ${err.toString()}',
+          isSent: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ));
         disconnect();
       });
       
@@ -136,10 +151,22 @@ class SocketController extends GetxController {
       
       _ioSocket!.onError((err) {
         connectionError.value = err.toString();
+        messages.add(SocketMessage(
+          content: 'Error: ${err.toString()}',
+          isSent: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ));
         disconnect();
       });
       
       _ioSocket!.onDisconnect((_) {
+        messages.add(SocketMessage(
+          content: 'Disconnected from $ioUrl',
+          isSent: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ));
         disconnect();
       });
       
@@ -178,7 +205,7 @@ class SocketController extends GetxController {
   }
 
   // Send Message
-  void sendMessage(String message, {String? eventName}) {
+  void sendMessage(String message, {String? eventName, bool withAck = false}) {
     if (!isConnected.value) return;
     
     if (_wsChannel != null) {
@@ -190,12 +217,26 @@ class SocketController extends GetxController {
       ));
     } else if (_ioSocket != null) {
       final event = eventName != null && eventName.isNotEmpty ? eventName : 'message';
+      dynamic data;
       try {
-        final parsedJson = jsonDecode(message);
-        _ioSocket!.emit(event, parsedJson);
+        data = jsonDecode(message);
       } catch (_) {
-        _ioSocket!.emit(event, message); // fallback to string
+        data = message; // fallback to string
       }
+      
+      if (withAck) {
+        _ioSocket!.emitWithAck(event, data, ack: (responseData) {
+          messages.add(SocketMessage(
+            content: responseData != null ? (responseData is String ? responseData : jsonEncode(responseData)) : 'Ack received',
+            isSent: false,
+            timestamp: DateTime.now(),
+            eventName: event,
+          ));
+        });
+      } else {
+        _ioSocket!.emit(event, data);
+      }
+      
       messages.add(SocketMessage(
         content: message,
         isSent: true,

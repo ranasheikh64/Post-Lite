@@ -1,76 +1,187 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_json_view/flutter_json_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:postmanclone/app/modules/home/controllers/workspace_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
 import 'package:postmanclone/app/modules/request_builder/widgets/events_table_view.dart'; // For EventsTableView
 
 class SocketIOBuilderView extends StatefulWidget {
-  const SocketIOBuilderView({Key? key}) : super(key: key);
+  const SocketIOBuilderView({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _SocketIOBuilderViewState createState() => _SocketIOBuilderViewState();
 }
 
+class CommentIntent extends Intent {
+  const CommentIntent();
+}
+
 class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
-  final SocketController socketController = Get.put(SocketController());
   final RequestBuilderController reqController =
       Get.find<RequestBuilderController>();
   final TextEditingController messageController = TextEditingController();
   final TextEditingController eventController = TextEditingController();
   final RxDouble topHeight = 400.0.obs;
+  final RxBool isAck = false.obs;
+  
+  List<String> savedEvents = [];
+  final FocusNode _eventFocusNode = FocusNode();
+
+  late final String requestTag;
+  late final SocketController socketController;
+
+  Future<void> _loadSavedEvents() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        savedEvents = prefs.getStringList('socket_events') ?? [];
+      });
+    }
+  }
+
+  Future<void> _saveEvent(String eventName) async {
+    if (eventName.isEmpty) return;
+    if (!savedEvents.contains(eventName)) {
+      savedEvents.add(eventName);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('socket_events', savedEvents);
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedEvents();
+    final reqId = reqController.currentRequestId.value;
+    requestTag = reqId != null && reqId.isNotEmpty ? reqId : 'new_socketio_request';
+    if (Get.isRegistered<SocketController>(tag: requestTag)) {
+      socketController = Get.find<SocketController>(tag: requestTag);
+    } else {
+      socketController = Get.put(SocketController(), tag: requestTag);
+    }
+    
+    // Load saved payload
+    final bodyVal = reqController.body.value;
+    if (bodyVal is Map && bodyVal['raw'] != null) {
+      messageController.text = bodyVal['raw'].toString();
+    } else if (bodyVal is String) {
+      messageController.text = bodyVal;
+    }
+    
+    // Load saved event name
+    final socketConfig = reqController.socketConfig;
+    if (socketConfig.containsKey('lastEventName')) {
+      eventController.text = socketConfig['lastEventName'].toString();
+    }
+    
+    // Save on change
+    messageController.addListener(() {
+      final b = reqController.body.value;
+      if (b is Map) {
+        final newBody = Map<String, dynamic>.from(b);
+        newBody['raw'] = messageController.text;
+        reqController.body.value = newBody;
+      } else {
+        reqController.body.value = {'raw': messageController.text};
+      }
+    });
+    
+    eventController.addListener(() {
+      final config = Map<String, dynamic>.from(reqController.socketConfig);
+      config['lastEventName'] = eventController.text;
+      reqController.socketConfig.value = config;
+    });
+  }
+
+  void _toggleComment() {
+    final text = messageController.text;
+    final selection = messageController.selection;
+    if (selection.baseOffset == -1) return;
+    
+    final start = selection.start;
+    final end = selection.end;
+    
+    final before = text.substring(0, start);
+    final after = text.substring(end);
+    
+    final lineStart = before.lastIndexOf('\n') + 1;
+    final lineEndIndex = after.indexOf('\n');
+    final lineEnd = lineEndIndex != -1 ? end + lineEndIndex : text.length;
+    
+    final selectedLinesText = text.substring(lineStart, lineEnd);
+    final lines = selectedLinesText.split('\n');
+    
+    // Check if ALL lines (that are not empty) are commented
+    final allCommented = lines.where((l) => l.trim().isNotEmpty).every((line) => line.trimLeft().startsWith('//'));
+    
+    final newLines = lines.map((line) {
+      if (line.trim().isEmpty) return line;
+      if (allCommented) {
+        if (line.trimLeft().startsWith('//')) {
+          return line.replaceFirst('//', '');
+        }
+        return line;
+      } else {
+        return '//$line';
+      }
+    }).toList();
+    
+    final newSelectedLinesText = newLines.join('\n');
+    final newText = text.substring(0, lineStart) + newSelectedLinesText + text.substring(lineEnd);
+    
+    final lengthDiff = newSelectedLinesText.length - selectedLinesText.length;
+    
+    messageController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection(
+        baseOffset: start,
+        extentOffset: (end + lengthDiff).clamp(0, newText.length),
+      ),
+    );
+  }
 
   @override
   void dispose() {
-    socketController.disconnect();
-    Get.delete<SocketController>();
+    // Do NOT disconnect or delete the controller here, so connections persist in the background
+    // when switching between different Socket.IO requests.
     super.dispose();
   }
 
   Widget _buildMessageContent(String data) {
     if (data.trim().startsWith('{') || data.trim().startsWith('[')) {
       try {
-        jsonDecode(data);
-        return SelectionArea(
-          child: JsonView.string(
-            data,
-            theme: const JsonViewTheme(
-              backgroundColor: Colors.transparent,
-              defaultTextStyle: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontFamily: 'monospace',
+        final decoded = jsonDecode(data);
+        final formattedJson = const JsonEncoder.withIndent('  ').convert(decoded);
+        return Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            title: const Text('JSON Payload', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            initiallyExpanded: true,
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SelectionArea(
+                  child: Text(
+                    formattedJson,
+                    style: const TextStyle(
+                      color: Color(0xFFA6E22E),
+                      fontSize: 13,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
               ),
-              viewType: JsonViewType.collapsible,
-              keyStyle: TextStyle(
-                color: Color(0xFF66D9EF),
-                fontSize: 13,
-                fontFamily: 'monospace',
-              ),
-              stringStyle: TextStyle(
-                color: Color(0xFFA6E22E),
-                fontSize: 13,
-                fontFamily: 'monospace',
-              ),
-              intStyle: TextStyle(
-                color: Color(0xFFFD971F),
-                fontSize: 13,
-                fontFamily: 'monospace',
-              ),
-              doubleStyle: TextStyle(
-                color: Color(0xFFFD971F),
-                fontSize: 13,
-                fontFamily: 'monospace',
-              ),
-              boolStyle: TextStyle(
-                color: Color(0xFFAE81FF),
-                fontSize: 13,
-                fontFamily: 'monospace',
-              ),
-            ),
+            ],
           ),
         );
       } catch (_) {}
@@ -81,11 +192,26 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     );
   }
 
+  String _resolveVariables(String text) {
+    if (text.isEmpty || !text.contains('{{')) return text;
+    try {
+      final workspaceController = Get.find<WorkspaceController>();
+      final variables = workspaceController.getVariablesForRequest(reqController.currentRequestId.value ?? '');
+      String resolvedText = text;
+      variables.forEach((key, value) {
+        resolvedText = resolvedText.replaceAll('{{$key}}', value);
+      });
+      return resolvedText;
+    } catch (_) {
+      return text;
+    }
+  }
+
   Map<String, String> _getHeaders() {
     final Map<String, String> headers = {};
     for (var h in reqController.headers) {
       if (h['enabled'] == true && h['key'].toString().isNotEmpty) {
-        headers[h['key']] = h['value'];
+        headers[_resolveVariables(h['key'])] = _resolveVariables(h['value']);
       }
     }
     return headers;
@@ -95,7 +221,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     final Map<String, String> queryParams = {};
     for (var q in reqController.queryParams) {
       if (q['enabled'] == true && q['key'].toString().isNotEmpty) {
-        queryParams[q['key']] = q['value'];
+        queryParams[_resolveVariables(q['key'])] = _resolveVariables(q['value']);
       }
     }
     return queryParams;
@@ -105,7 +231,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     if (socketController.isConnected.value) {
       socketController.disconnect();
     } else {
-      socketController.connectSocketIO(reqController.url.value, _getHeaders(), _getQueryParams());
+      socketController.connectSocketIO(_resolveVariables(reqController.url.value), _getHeaders(), _getQueryParams());
     }
   }
 
@@ -382,24 +508,44 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                               child: Column(
                                                 children: [
                                                   Expanded(
-                                                    child: TextField(
-                                                      controller: messageController,
-                                                      maxLines: null,
-                                                      expands: true,
-                                                      textAlignVertical:
-                                                          TextAlignVertical.top,
-                                                      style: const TextStyle(
-                                                        fontFamily: 'monospace',
-                                                        fontSize: 13,
-                                                      ),
-                                                      decoration: const InputDecoration(
-                                                        hoverColor:
-                                                            Colors.transparent,
-                                                        filled: false,
-                                                        hintText:
-                                                            'Enter JSON payload...',
-                                                        border: InputBorder.none,
-                                                        isDense: true,
+                                                    child: Shortcuts(
+                                                      shortcuts: <LogicalKeySet, Intent>{
+                                                        LogicalKeySet(
+                                                          defaultTargetPlatform == TargetPlatform.macOS
+                                                              ? LogicalKeyboardKey.meta
+                                                              : LogicalKeyboardKey.control,
+                                                          LogicalKeyboardKey.slash,
+                                                        ): const CommentIntent(),
+                                                      },
+                                                      child: Actions(
+                                                        actions: <Type, Action<Intent>>{
+                                                          CommentIntent: CallbackAction<CommentIntent>(
+                                                            onInvoke: (CommentIntent intent) {
+                                                              _toggleComment();
+                                                              return null;
+                                                            },
+                                                          ),
+                                                        },
+                                                        child: TextField(
+                                                          controller: messageController,
+                                                          maxLines: null,
+                                                          expands: true,
+                                                          textAlignVertical:
+                                                              TextAlignVertical.top,
+                                                          style: const TextStyle(
+                                                            fontFamily: 'monospace',
+                                                            fontSize: 13,
+                                                          ),
+                                                          decoration: const InputDecoration(
+                                                            hoverColor:
+                                                                Colors.transparent,
+                                                            filled: false,
+                                                            hintText:
+                                                                'Enter JSON payload...',
+                                                            border: InputBorder.none,
+                                                            isDense: true,
+                                                          ),
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
@@ -408,28 +554,78 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                                     mainAxisAlignment:
                                                         MainAxisAlignment.end,
                                                     children: [
+                                                      Row(
+                                                        children: [
+                                                          Obx(() => Checkbox(
+                                                            value: isAck.value,
+                                                            onChanged: (val) {
+                                                              if (val != null) isAck.value = val;
+                                                            },
+                                                          )),
+                                                          const Text('Ack', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                                          const SizedBox(width: 8),
+                                                        ],
+                                                      ),
                                                       SizedBox(
                                                         width: 150,
-                                                        child: TextField(
-                                                          controller:
-                                                              eventController,
-                                                          style: const TextStyle(
-                                                            fontSize: 13,
-                                                          ),
-                                                          decoration: const InputDecoration(
-                                                            hoverColor:
-                                                                Colors.transparent,
-                                                            filled: false,
-                                                            hintText:
-                                                                'Event name',
-                                                            border: OutlineInputBorder(),
-                                                            isDense: true,
-                                                            contentPadding:
-                                                                EdgeInsets.symmetric(
-                                                                  horizontal: 8,
-                                                                  vertical: 8,
+                                                        child: RawAutocomplete<String>(
+                                                          textEditingController: eventController,
+                                                          focusNode: _eventFocusNode,
+                                                          optionsBuilder: (TextEditingValue textEditingValue) {
+                                                            if (textEditingValue.text.isEmpty) {
+                                                              return savedEvents;
+                                                            }
+                                                            return savedEvents.where((String option) {
+                                                              return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                                                            });
+                                                          },
+                                                          fieldViewBuilder: (BuildContext context, TextEditingController textEditingController, FocusNode focusNode, VoidCallback onFieldSubmitted) {
+                                                            return TextField(
+                                                              controller: textEditingController,
+                                                              focusNode: focusNode,
+                                                              style: const TextStyle(fontSize: 13),
+                                                              decoration: const InputDecoration(
+                                                                hoverColor: Colors.transparent,
+                                                                filled: false,
+                                                                hintText: 'Event name',
+                                                                border: OutlineInputBorder(),
+                                                                isDense: true,
+                                                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                              ),
+                                                              onSubmitted: (String value) {
+                                                                onFieldSubmitted();
+                                                              },
+                                                            );
+                                                          },
+                                                          optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                                                            return Align(
+                                                              alignment: Alignment.topLeft,
+                                                              child: Material(
+                                                                elevation: 4.0,
+                                                                color: const Color(0xFF2C2C2C),
+                                                                borderRadius: BorderRadius.circular(4),
+                                                                child: ConstrainedBox(
+                                                                  constraints: const BoxConstraints(maxHeight: 200, maxWidth: 150),
+                                                                  child: ListView.builder(
+                                                                    padding: EdgeInsets.zero,
+                                                                    itemCount: options.length,
+                                                                    itemBuilder: (BuildContext context, int index) {
+                                                                      final String option = options.elementAt(index);
+                                                                      return InkWell(
+                                                                        onTap: () {
+                                                                          onSelected(option);
+                                                                        },
+                                                                        child: Padding(
+                                                                          padding: const EdgeInsets.all(8.0),
+                                                                          child: Text(option, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                  ),
                                                                 ),
-                                                          ),
+                                                              ),
+                                                            );
+                                                          },
                                                         ),
                                                       ),
                                                       const SizedBox(width: 8),
@@ -443,16 +639,22 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                                                   if (messageController
                                                                       .text
                                                                       .isNotEmpty) {
+                                                                    _saveEvent(eventController.text);
+                                                                    
+                                                                    final rawText = messageController.text;
+                                                                    final cleanText = rawText
+                                                                        .split('\n')
+                                                                        .where((line) => !line.trimLeft().startsWith('//'))
+                                                                        .join('\n');
+                                                                        
                                                                     socketController
                                                                         .sendMessage(
-                                                                          messageController
-                                                                              .text,
+                                                                          cleanText,
                                                                           eventName:
                                                                               eventController
                                                                                   .text,
+                                                                          withAck: isAck.value,
                                                                         );
-                                                                    messageController
-                                                                        .clear();
                                                                   }
                                                                 }
                                                               : null,
@@ -592,15 +794,26 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Icon(
-                                              msg.isSent
-                                                  ? Icons.arrow_upward
-                                                  : Icons.arrow_downward,
-                                              color: msg.isSent
-                                                  ? Colors.orange
-                                                  : Colors.blue,
-                                              size: 16,
-                                            ),
+                                            if (msg.isSystem)
+                                              Icon(
+                                                msg.content.startsWith('Connected')
+                                                    ? Icons.check_circle_outline
+                                                    : Icons.info_outline,
+                                                color: msg.content.startsWith('Connected')
+                                                    ? Colors.green
+                                                    : Colors.grey,
+                                                size: 16,
+                                              )
+                                            else
+                                              Icon(
+                                                msg.isSent
+                                                    ? Icons.arrow_upward
+                                                    : Icons.arrow_downward,
+                                                color: msg.isSent
+                                                    ? Colors.orange
+                                                    : Colors.blue,
+                                                size: 16,
+                                              ),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Column(
@@ -609,14 +822,20 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                                 children: [
                                                   if (msg.eventName != null &&
                                                       msg.eventName!.isNotEmpty)
-                                                    Text(
-                                                      'Event: ${msg.eventName}',
-                                                      style: const TextStyle(
-                                                        color:
-                                                            Colors.orangeAccent,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 12,
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFF2E3B51).withOpacity(0.5),
+                                                        border: Border.all(color: const Color(0xFF3F4F6A)),
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        msg.eventName!,
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF6DA2FF),
+                                                          fontSize: 12,
+                                                          fontFamily: 'monospace'
+                                                        ),
                                                       ),
                                                     ),
                                                   const SizedBox(height: 4),

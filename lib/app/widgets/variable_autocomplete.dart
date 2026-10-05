@@ -152,6 +152,10 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   onPressed: () {
+                    final reqController = Get.find<RequestBuilderController>();
+                    final dialogController = VariableTextEditingController(reqController)
+                      ..text = textEditingController.text;
+                      
                     showDialog(
                       context: context,
                       builder: (context) {
@@ -161,9 +165,14 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
                           content: SizedBox(
                             width: 600,
                             child: TextField(
-                              controller: textEditingController, // Shares the same controller!
+                              controller: dialogController,
                               maxLines: 15,
-                              onChanged: widget.onChanged,
+                              onChanged: (val) {
+                                textEditingController.text = val;
+                                if (widget.onChanged != null) {
+                                  widget.onChanged!(val);
+                                }
+                              },
                               style: const TextStyle(color: Color(0xFFCE9178), fontFamily: 'monospace', fontSize: 13),
                               decoration: InputDecoration(
                                 filled: true,
@@ -184,7 +193,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
                           ],
                         );
                       }
-                    );
+                    ).then((_) => dialogController.dispose());
                   },
                 ),
               );

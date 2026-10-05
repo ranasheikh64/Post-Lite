@@ -19,7 +19,7 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
       if (controller.requestKind.value == 'websocket') {
         return const WebSocketBuilderView();
       } else if (controller.requestKind.value == 'socketio') {
-        return const SocketIOBuilderView();
+        return SocketIOBuilderView(key: ValueKey(controller.currentRequestId.value ?? 'new_request'));
       }
 
       return Column(
@@ -1211,7 +1211,7 @@ class DynamicTableView extends StatelessWidget {
                                   Expanded(
                                     child: VariableAutocomplete(
                                       key: ValueKey(
-                                        '${controller.currentRequestId.value}_${title}_key_$uniqueId',
+                                        '${title}_key_$uniqueId',
                                       ),
                                       initialValue: item['key'],
                                       onChanged: (val) {
@@ -1391,7 +1391,7 @@ class DynamicTableView extends StatelessWidget {
                                       ),
                                       child: VariableAutocomplete(
                                         key: ValueKey(
-                                          '${controller.currentRequestId.value}_${title}_val_$uniqueId',
+                                          '${title}_val_$uniqueId',
                                         ),
                                         initialValue: item['value'],
                                         onChanged: (val) {
