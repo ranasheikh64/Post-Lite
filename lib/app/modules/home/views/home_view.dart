@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/core/theme/app_theme.dart';
 import 'package:postmanclone/app/routes/app_routes.dart';
@@ -114,6 +115,7 @@ class HomeView extends GetView<WorkspaceController> {
                                     child: DropdownButtonHideUnderline(
                                       child: DropdownButton<String?>(
                                         isExpanded: true,
+                                        focusColor: Colors.transparent,
                                         value: workspaceController
                                             .selectedWorkspaceId
                                             .value,
@@ -339,10 +341,24 @@ class HomeView extends GetView<WorkspaceController> {
                           const Divider(height: 1),
                           Expanded(
                             child: Obx(() {
-                              if (workspaceController.isLoading.value &&
-                                  workspaceController.collections.isEmpty) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
+                              if (workspaceController.isLoading.value) {
+                                return ListView.builder(
+                                  itemCount: 5,
+                                  itemBuilder: (context, index) {
+                                    return Shimmer.fromColors(
+                                      baseColor: Colors.grey[800]!,
+                                      highlightColor: Colors.grey[700]!,
+                                      child: ListTile(
+                                        leading: const Icon(Icons.folder, color: Colors.white),
+                                        title: Container(
+                                          height: 14,
+                                          width: double.infinity,
+                                          color: Colors.white,
+                                          margin: const EdgeInsets.only(right: 50),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 );
                               }
                               if (workspaceController.collections.isEmpty) {
