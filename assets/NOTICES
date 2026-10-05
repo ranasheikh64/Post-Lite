@@ -1781,9 +1781,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 --------------------------------------------------------------------------------
 cross_file
-cupertino_ui
 google_fonts
-material_ui
 path_provider
 path_provider_android
 path_provider_foundation
