@@ -14,4 +14,6 @@ router.post('/invite/:token/accept', ctrl.acceptInvite);
 router.patch('/:id/members/:userId', ctrl.updateMemberRole);
 router.delete('/:id/members/:userId', ctrl.removeMember);
 
+router.get('/:id/search', ctrl.searchWorkspace);
+
 module.exports = router;

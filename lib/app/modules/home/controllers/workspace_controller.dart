@@ -5,6 +5,7 @@ import 'dart:developer';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
@@ -60,6 +61,43 @@ class WorkspaceController extends GetxController {
       selectedRequestIds.remove(id);
     } else {
       selectedRequestIds.add(id);
+    }
+  }
+
+  Future<Map<String, dynamic>> search(String query) async {
+    if (query.trim().isEmpty) return {'collections': [], 'requests': []};
+    try {
+      final wsId = selectedWorkspaceId.value;
+      if (wsId == null) {
+        // For personal workspace (no id), we might just filter locally or call a different API.
+        // For now, let's implement local filtering for personal workspace
+        final q = query.toLowerCase();
+        final matchedCollections = collections.where((c) => (c['name'] as String).toLowerCase().contains(q)).toList();
+        final matchedRequests = <dynamic>[];
+        
+        void searchRequests(List<dynamic> nodes) {
+          for (var node in nodes) {
+            if (node['requests'] != null) {
+              for (var req in node['requests']) {
+                if ((req['name'] as String).toLowerCase().contains(q) || (req['url'] as String).toLowerCase().contains(q)) {
+                  // create a copy to add collection info if needed
+                  matchedRequests.add({...req as Map, 'collectionId': {'name': node['name']}});
+                }
+              }
+            }
+            if (node['folders'] != null) {
+              searchRequests(node['folders']);
+            }
+          }
+        }
+        searchRequests(collections);
+        return {'collections': matchedCollections, 'requests': matchedRequests};
+      } else {
+        return await _apiService.searchWorkspace(wsId, query);
+      }
+    } catch (e) {
+      log('Search failed', error: e);
+      return {'collections': [], 'requests': []};
     }
   }
 
@@ -838,6 +876,79 @@ class WorkspaceController extends GetxController {
         log('DioResponse: ${e.response?.data}', name: 'WorkspaceController');
       }
       CustomSnackbar.show(title: 'Error', message: msg, isError: true);
+    }
+  }
+
+  Future<void> duplicateRequest(Map<String, dynamic> req) async {
+    final requestId = req['_id'];
+    String? parentId;
+
+    bool findPath(List<dynamic> currentLevel) {
+      for (final node in currentLevel) {
+        if (node['requests'] != null) {
+          for (final r in node['requests']) {
+            if (r['_id'] == requestId) {
+              parentId = node['_id'];
+              return true;
+            }
+          }
+        }
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (findPath(node['folders'])) return true;
+        }
+      }
+      return false;
+    }
+
+    findPath(collections);
+
+    if (parentId == null) {
+      CustomSnackbar.show(
+          title: 'Error', message: 'Could not find parent collection', isError: true);
+      return;
+    }
+
+    try {
+      CustomLoader.show();
+      final name = '${req['name']} Copy';
+      final newReq = await _apiService.createRequest(
+        parentId!,
+        name,
+        method: req['method'] ?? 'GET',
+        requestKind: req['requestKind'] ?? 'http',
+      );
+
+      final updateData = Map<String, dynamic>.from(req);
+      updateData.remove('_id');
+      updateData.remove('createdAt');
+      updateData.remove('updatedAt');
+      updateData.remove('__v');
+      updateData.remove('savedResponses');
+      updateData.remove('collectionId');
+      updateData['name'] = name;
+
+      await _apiService.updateRequest(newReq['_id'], updateData);
+      await fetchCollections();
+      CustomLoader.hide();
+    } catch (e, stack) {
+      CustomLoader.hide();
+      log('Failed to duplicate request', error: e, stackTrace: stack, name: 'WorkspaceController');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to duplicate request', isError: true);
+    }
+  }
+
+  Future<void> renameRequest(String requestId, String newName) async {
+    try {
+      await _apiService.updateRequest(requestId, {'name': newName});
+      updateRequestLocally(requestId, {'name': newName});
+      
+      try {
+        final reqBuilder = Get.find<RequestBuilderController>();
+        reqBuilder.updateOpenRequestName(requestId, newName);
+      } catch (_) {}
+    } catch (e, stack) {
+      log('Failed to rename request', error: e, stackTrace: stack, name: 'WorkspaceController');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to rename request', isError: true);
     }
   }
 
