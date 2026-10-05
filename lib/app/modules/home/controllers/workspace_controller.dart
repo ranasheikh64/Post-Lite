@@ -988,10 +988,30 @@ class WorkspaceController extends GetxController {
       final updatedReq = await _apiService.updateRequest(newReq['_id'], updateData);
       
       if (parentNode != null && parentNode!['requests'] != null) {
-        parentNode!['requests'].add(updatedReq);
+        final currentRequests = List<dynamic>.from(parentNode!['requests']);
+        
+        // Find the index of the original request to insert right after it
+        final originalIndex = currentRequests.indexWhere((r) => r['_id'] == requestId);
+        
+        if (originalIndex != -1) {
+          currentRequests.insert(originalIndex + 1, updatedReq);
+        } else {
+          currentRequests.add(updatedReq);
+        }
+        
+        parentNode!['requests'] = currentRequests;
         collections.refresh();
+        
+        // Background sync to ensure the backend saves this precise order for future reloads
+        try {
+          final requestIds = currentRequests.map<String>((r) => r['_id'] as String).toList();
+          _apiService.reorderRequests(requestIds);
+        } catch (_) {}
+
+        CustomSnackbar.show(title: 'Success', message: 'Request duplicated');
       } else {
         await fetchCollections();
+        CustomSnackbar.show(title: 'Success', message: 'Request duplicated (Reloaded tree)');
       }
     } catch (e, stack) {
       log('Failed to duplicate request', error: e, stackTrace: stack, name: 'WorkspaceController');
