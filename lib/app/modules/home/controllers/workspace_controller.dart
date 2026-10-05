@@ -21,6 +21,7 @@ class WorkspaceController extends GetxController {
   final selectedWorkspaceId = RxnString();
   final userRoleInWorkspace =
       'owner'.obs; // 'owner', 'admin', 'editor', 'viewer'
+  final RxString duplicatingRequestId = ''.obs;
 
   final sidebarWidth = 300.0.obs;
   final isSidebarVisible = true.obs;
@@ -209,6 +210,31 @@ class WorkspaceController extends GetxController {
     }
 
     if (updateInList(collections)) {
+      collections.refresh();
+    }
+  }
+
+  void removeRequestLocally(String requestId) {
+    bool removeInList(List<dynamic> currentLevel) {
+      for (final node in currentLevel) {
+        if (node['requests'] != null) {
+          final initialLength = (node['requests'] as List).length;
+          node['requests'].removeWhere((req) => req['_id'] == requestId);
+          if ((node['requests'] as List).length < initialLength) {
+            return true;
+          }
+        }
+
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (removeInList(node['folders'])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    if (removeInList(collections)) {
       collections.refresh();
     }
   }
@@ -794,10 +820,33 @@ class WorkspaceController extends GetxController {
     };
   }
 
+  void removeCollectionLocally(String collectionId) {
+    bool removeInList(List<dynamic> currentLevel) {
+      final initialLength = currentLevel.length;
+      currentLevel.removeWhere((c) => c['_id'] == collectionId);
+      if (currentLevel.length < initialLength) {
+        return true;
+      }
+      
+      for (final node in currentLevel) {
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (removeInList(node['folders'])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    if (removeInList(collections)) {
+      collections.refresh();
+    }
+  }
+
   Future<void> deleteCollection(String id) async {
     try {
       await _apiService.deleteCollection(id);
-      await fetchCollections();
+      removeCollectionLocally(id);
       CustomSnackbar.show(title: 'Success', message: 'Deleted successfully');
     } catch (e, stack) {
       log(
@@ -882,6 +931,7 @@ class WorkspaceController extends GetxController {
   Future<void> duplicateRequest(Map<String, dynamic> req) async {
     final requestId = req['_id'];
     String? parentId;
+    Map<String, dynamic>? parentNode;
 
     bool findPath(List<dynamic> currentLevel) {
       for (final node in currentLevel) {
@@ -889,6 +939,7 @@ class WorkspaceController extends GetxController {
           for (final r in node['requests']) {
             if (r['_id'] == requestId) {
               parentId = node['_id'];
+              parentNode = node;
               return true;
             }
           }
@@ -909,7 +960,8 @@ class WorkspaceController extends GetxController {
     }
 
     try {
-      CustomLoader.show();
+      duplicatingRequestId.value = requestId;
+      
       final name = '${req['name']} Copy';
       final newReq = await _apiService.createRequest(
         parentId!,
@@ -918,7 +970,13 @@ class WorkspaceController extends GetxController {
         requestKind: req['requestKind'] ?? 'http',
       );
 
-      final updateData = Map<String, dynamic>.from(req);
+      final rawData = Map<String, dynamic>.from(req);
+      rawData.remove('isExpanded');
+      rawData.remove('isHovered');
+      
+      // Use jsonDecode/jsonEncode to ensure a complete deep copy without any GetX Rx variables or references
+      final updateData = jsonDecode(jsonEncode(rawData)) as Map<String, dynamic>;
+
       updateData.remove('_id');
       updateData.remove('createdAt');
       updateData.remove('updatedAt');
@@ -927,13 +985,19 @@ class WorkspaceController extends GetxController {
       updateData.remove('collectionId');
       updateData['name'] = name;
 
-      await _apiService.updateRequest(newReq['_id'], updateData);
-      await fetchCollections();
-      CustomLoader.hide();
+      final updatedReq = await _apiService.updateRequest(newReq['_id'], updateData);
+      
+      if (parentNode != null && parentNode!['requests'] != null) {
+        parentNode!['requests'].add(updatedReq);
+        collections.refresh();
+      } else {
+        await fetchCollections();
+      }
     } catch (e, stack) {
-      CustomLoader.hide();
       log('Failed to duplicate request', error: e, stackTrace: stack, name: 'WorkspaceController');
       CustomSnackbar.show(title: 'Error', message: 'Failed to duplicate request', isError: true);
+    } finally {
+      duplicatingRequestId.value = '';
     }
   }
 
@@ -955,7 +1019,23 @@ class WorkspaceController extends GetxController {
   Future<void> deleteRequest(String id) async {
     try {
       await _apiService.deleteRequest(id);
-      await fetchCollections();
+      removeRequestLocally(id);
+      
+      // Also close it from the request builder if it's open
+      try {
+        final reqBuilder = Get.find<RequestBuilderController>();
+        if (reqBuilder.currentRequestId.value == id) {
+          reqBuilder.openRequests.removeWhere((req) => req['_id'] == id);
+          if (reqBuilder.openRequests.isNotEmpty) {
+            reqBuilder.loadRequest(reqBuilder.openRequests.last);
+          } else {
+            reqBuilder.currentRequestId.value = null;
+          }
+        } else {
+          reqBuilder.openRequests.removeWhere((req) => req['_id'] == id);
+        }
+      } catch (_) {}
+      
       CustomSnackbar.show(title: 'Success', message: 'Request deleted');
     } catch (e, stack) {
       log(

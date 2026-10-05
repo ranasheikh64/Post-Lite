@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get.dart';
 import '../controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 
