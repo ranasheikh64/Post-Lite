@@ -69,6 +69,7 @@ class RequestBuilderController extends GetxController {
 
   var currentRequestId = RxnString();
   var currentPath = 'Workspace > Collection'.obs;
+  var openRequests = <Map<String, dynamic>>[].obs;
 
   // -- Request State --
   var requestKind = 'http'.obs;
@@ -363,6 +364,74 @@ class RequestBuilderController extends GetxController {
 
     currentRequestId.value = request['_id'];
     currentPath.value = path;
+
+    bool exists = openRequests.any((req) => req['_id'] == request['_id']);
+    if (!exists) {
+      openRequests.add(Map<String, dynamic>.from(request));
+    }
+
+    _finishLoadRequest(request);
+  }
+
+  void updateOpenRequestName(String reqId, String newName) {
+    for (var i = 0; i < openRequests.length; i++) {
+      if (openRequests[i]['_id'] == reqId) {
+        openRequests[i]['name'] = newName;
+        openRequests.refresh();
+        break;
+      }
+    }
+  }
+
+  void closeOtherRequests(String id) {
+    openRequests.removeWhere((req) => req['_id'] != id);
+    if (currentRequestId.value != id && openRequests.isNotEmpty) {
+      final req = openRequests.first;
+      loadRequest(req, path: 'Recent > ${req['name']}');
+    }
+  }
+
+  void closeRequestsToRight(String id) {
+    int idx = openRequests.indexWhere((req) => req['_id'] == id);
+    if (idx != -1 && idx < openRequests.length - 1) {
+      final toRemove = openRequests.sublist(idx + 1).map((r) => r['_id']).toSet();
+      openRequests.removeRange(idx + 1, openRequests.length);
+      if (toRemove.contains(currentRequestId.value)) {
+        if (openRequests.isNotEmpty) {
+          final req = openRequests.last;
+          loadRequest(req, path: 'Recent > ${req['name']}');
+        } else {
+          currentRequestId.value = null;
+        }
+      }
+    }
+  }
+
+  void closeRequestsToLeft(String id) {
+    int idx = openRequests.indexWhere((req) => req['_id'] == id);
+    if (idx > 0) {
+      final toRemove = openRequests.sublist(0, idx).map((r) => r['_id']).toSet();
+      openRequests.removeRange(0, idx);
+      if (toRemove.contains(currentRequestId.value)) {
+        if (openRequests.isNotEmpty) {
+          final req = openRequests.first;
+          loadRequest(req, path: 'Recent > ${req['name']}');
+        } else {
+          currentRequestId.value = null;
+        }
+      }
+    }
+  }
+
+  void reorderRequests(int oldIndex, int newIndex) {
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    final req = openRequests.removeAt(oldIndex);
+    openRequests.insert(newIndex, req);
+  }
+
+  void _finishLoadRequest(Map<String, dynamic> request) {
 
     originalRequestKind = request['requestKind'] ?? 'http';
     originalMethod = request['method'] ?? 'GET';

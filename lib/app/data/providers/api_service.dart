@@ -48,6 +48,11 @@ class ApiService {
     await _network.deleteRequest('/workspaces/$workspaceId/members/$userId');
   }
 
+  Future<Map<String, dynamic>> searchWorkspace(String workspaceId, String query) async {
+    final response = await _network.getRequest('/workspaces/$workspaceId/search', queryParameters: {'q': query});
+    return response.data;
+  }
+
   // --- Collections ---
   
   Future<List<dynamic>> getCollections({String? workspaceId}) async {

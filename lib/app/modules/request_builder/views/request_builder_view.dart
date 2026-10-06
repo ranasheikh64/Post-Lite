@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:postmanclone/app/widgets/custom_json_viewer.dart';
 import 'package:get/get.dart';
@@ -22,7 +24,9 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
       if (controller.requestKind.value == 'websocket') {
         return const WebSocketBuilderView();
       } else if (controller.requestKind.value == 'socketio') {
-        return SocketIOBuilderView(key: ValueKey(controller.currentRequestId.value ?? 'new_request'));
+        return SocketIOBuilderView(
+          key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
+        );
       }
 
       return Column(
@@ -40,17 +44,181 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Obx(
-                    () => Text(
-                      '${controller.currentPath.value} > ${controller.currentRequestId.value == null
-                          ? "New Request"
-                          : controller.url.value.split("/").last.isEmpty
-                          ? "Unnamed Request"
-                          : controller.url.value.split("/").last}',
-                      style: const TextStyle(color: Colors.grey, fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                  child: Obx(() {
+                    if (controller.openRequests.isEmpty) {
+                      return const Text(
+                        'No active requests',
+                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                      );
+                    }
+                    return Listener(
+                      onPointerDown: (event) {
+                        if (kIsWeb && event.buttons == kSecondaryMouseButton) {
+                          BrowserContextMenu.disableContextMenu();
+                        }
+                      },
+                      onPointerUp: (event) {
+                        if (kIsWeb && event.buttons == kSecondaryButton) {
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            BrowserContextMenu.enableContextMenu();
+                          });
+                        }
+                      },
+                      child: SizedBox(
+                        height: 36,
+                        child: ReorderableListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          buildDefaultDragHandles: false,
+                          itemCount: controller.openRequests.length,
+                          onReorder: (oldIndex, newIndex) {
+                            controller.reorderRequests(oldIndex, newIndex);
+                          },
+                          itemBuilder: (context, index) {
+                            final req = controller.openRequests[index];
+                            final isActive =
+                                req['_id'] == controller.currentRequestId.value;
+                            return ReorderableDragStartListener(
+                              key: ValueKey(req['_id']),
+                              index: index,
+                              child: GestureDetector(
+                                onSecondaryTapDown: (details) {
+                                  showMenu(
+                                    context: context,
+                                    position: RelativeRect.fromLTRB(
+                                      details.globalPosition.dx,
+                                      details.globalPosition.dy,
+                                      details.globalPosition.dx,
+                                      details.globalPosition.dy,
+                                    ),
+                                    items: const [
+                                      PopupMenuItem(
+                                        value: 'close_others',
+                                        child: Text(
+                                          'Close other tabs',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'close_right',
+                                        child: Text(
+                                          'Close tabs to the right',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'close_left',
+                                        child: Text(
+                                          'Close tabs to the left',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                    color: const Color(0xFF2A2D3E),
+                                  ).then((value) {
+                                    if (value == 'close_others') {
+                                      controller.closeOtherRequests(req['_id']);
+                                    } else if (value == 'close_right') {
+                                      controller.closeRequestsToRight(
+                                        req['_id'],
+                                      );
+                                    } else if (value == 'close_left') {
+                                      controller.closeRequestsToLeft(
+                                        req['_id'],
+                                      );
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 4),
+                                  decoration: BoxDecoration(
+                                    color: isActive
+                                        ? const Color(0xFF2A2D3E)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () => controller.loadRequest(
+                                      req,
+                                      path: 'Recent > ${req['name']}',
+                                    ),
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            req['method'] ?? 'GET',
+                                            style: TextStyle(
+                                              color: AppTheme.getMethodColor(
+                                                req['method'] ?? 'GET',
+                                              ),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            req['name'] ?? 'Unnamed',
+                                            style: TextStyle(
+                                              color: isActive
+                                                  ? Colors.white
+                                                  : Colors.white54,
+                                              fontSize: 13,
+                                              fontWeight: isActive
+                                                  ? FontWeight.w500
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          InkWell(
+                                            onTap: () {
+                                              controller.openRequests
+                                                  .removeWhere(
+                                                    (r) =>
+                                                        r['_id'] == req['_id'],
+                                                  );
+                                              if (isActive) {
+                                                if (controller
+                                                    .openRequests
+                                                    .isNotEmpty) {
+                                                  final lastReq = controller
+                                                      .openRequests
+                                                      .last;
+                                                  controller.loadRequest(
+                                                    lastReq,
+                                                    path:
+                                                        'Recent > ${lastReq['name']}',
+                                                  );
+                                                } else {
+                                                  controller
+                                                          .currentRequestId
+                                                          .value =
+                                                      null;
+                                                }
+                                              }
+                                            },
+                                            child: const Icon(
+                                              Icons.close,
+                                              size: 14,
+                                              color: Colors.white38,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  }),
                 ),
                 Row(
                   children: [
@@ -58,21 +226,6 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                       onPressed: () => controller.saveChanges(),
                       icon: const Icon(Icons.save, size: 16),
                       label: const Text('Save'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey[300],
-                        side: BorderSide(color: Colors.grey[800]!),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        minimumSize: const Size(0, 32),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.share, size: 16),
-                      label: const Text('Share'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.grey[300],
                         side: BorderSide(color: Colors.grey[800]!),
@@ -503,10 +656,23 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                                           const SizedBox(width: 8),
                                           IconButton(
                                             onPressed: () {
-                                              Clipboard.setData(ClipboardData(text: controller.responseData.value));
-                                              CustomSnackbar.show(title: 'Copied', message: 'Response copied to clipboard');
+                                              Clipboard.setData(
+                                                ClipboardData(
+                                                  text: controller
+                                                      .responseData
+                                                      .value,
+                                                ),
+                                              );
+                                              CustomSnackbar.show(
+                                                title: 'Copied',
+                                                message:
+                                                    'Response copied to clipboard',
+                                              );
                                             },
-                                            icon: const Icon(Icons.copy, size: 14),
+                                            icon: const Icon(
+                                              Icons.copy,
+                                              size: 14,
+                                            ),
                                             tooltip: 'Copy Response',
                                             color: Colors.grey,
                                             padding: EdgeInsets.zero,
@@ -615,7 +781,9 @@ class _AuthView extends StatelessWidget {
           width: 250,
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            border: Border(right: BorderSide(color: Colors.grey[800]!)),
+            border: Border(
+              right: BorderSide(color: Colors.white.withOpacity(0.05)),
+            ),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -624,54 +792,53 @@ class _AuthView extends StatelessWidget {
                 const Text(
                   'Auth Type',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     fontSize: 13,
-                    color: Colors.grey,
+                    color: Colors.white70,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Obx(
                   () => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.grey[700]!),
+                      color: const Color(0xFF2A2D3E),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: controller.authType.value,
                         isExpanded: true,
-                        focusColor: Colors.transparent,
-                        dropdownColor: const Color(0xFF2B2B2B),
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: Colors.white54,
+                        ),
+                        dropdownColor: const Color(0xFF2A2D3E),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                         items: const [
                           DropdownMenuItem(
                             value: 'inherit',
-                            child: Text(
-                              'Inherit auth from parent',
-                              style: TextStyle(fontSize: 13),
-                            ),
+                            child: Text('Inherit auth from parent'),
                           ),
                           DropdownMenuItem(
                             value: 'none',
-                            child: Text(
-                              'No Auth',
-                              style: TextStyle(fontSize: 13),
-                            ),
+                            child: Text('No Auth'),
                           ),
                           DropdownMenuItem(
                             value: 'bearer',
-                            child: Text(
-                              'Bearer Token',
-                              style: TextStyle(fontSize: 13),
-                            ),
+                            child: Text('Bearer Token'),
                           ),
                           DropdownMenuItem(
                             value: 'basic',
-                            child: Text(
-                              'Basic Auth',
-                              style: TextStyle(fontSize: 13),
-                            ),
+                            child: Text('Basic Auth'),
                           ),
                         ],
                         onChanged: (val) {
@@ -1199,9 +1366,7 @@ class DynamicTableView extends StatelessWidget {
                                 children: [
                                   Expanded(
                                     child: VariableAutocomplete(
-                                      key: ValueKey(
-                                        '${title}_key_$uniqueId',
-                                      ),
+                                      key: ValueKey('${title}_key_$uniqueId'),
                                       initialValue: item['key'],
                                       onChanged: (val) {
                                         final newItems =
@@ -1357,13 +1522,22 @@ class DynamicTableView extends StatelessWidget {
                                       ],
                                     )
                                   : Tooltip(
-                                      message: (item['value']?.toString() ?? '').replaceAllMapped(RegExp(r'.{1,60}'), (match) => '${match.group(0)}\n').trim(),
-                                      waitDuration: const Duration(milliseconds: 400),
+                                      message: (item['value']?.toString() ?? '')
+                                          .replaceAllMapped(
+                                            RegExp(r'.{1,60}'),
+                                            (match) => '${match.group(0)}\n',
+                                          )
+                                          .trim(),
+                                      waitDuration: const Duration(
+                                        milliseconds: 400,
+                                      ),
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF1E1E1E),
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.grey[800]!),
+                                        border: Border.all(
+                                          color: Colors.grey[800]!,
+                                        ),
                                         boxShadow: const [
                                           BoxShadow(
                                             color: Colors.black54,
@@ -1373,15 +1547,15 @@ class DynamicTableView extends StatelessWidget {
                                         ],
                                       ),
                                       textStyle: const TextStyle(
-                                        color: Color(0xFFCE9178), // VS Code orange/string color
+                                        color: Color(
+                                          0xFFCE9178,
+                                        ), // VS Code orange/string color
                                         fontSize: 13,
                                         fontFamily: 'monospace',
                                         height: 1.5,
                                       ),
                                       child: VariableAutocomplete(
-                                        key: ValueKey(
-                                          '${title}_val_$uniqueId',
-                                        ),
+                                        key: ValueKey('${title}_val_$uniqueId'),
                                         initialValue: item['value'],
                                         onChanged: (val) {
                                           final newItems =

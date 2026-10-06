@@ -5,6 +5,7 @@ import 'dart:developer';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
@@ -20,6 +21,7 @@ class WorkspaceController extends GetxController {
   final selectedWorkspaceId = RxnString();
   final userRoleInWorkspace =
       'owner'.obs; // 'owner', 'admin', 'editor', 'viewer'
+  final RxString duplicatingRequestId = ''.obs;
 
   final sidebarWidth = 300.0.obs;
   final isSidebarVisible = true.obs;
@@ -60,6 +62,43 @@ class WorkspaceController extends GetxController {
       selectedRequestIds.remove(id);
     } else {
       selectedRequestIds.add(id);
+    }
+  }
+
+  Future<Map<String, dynamic>> search(String query) async {
+    if (query.trim().isEmpty) return {'collections': [], 'requests': []};
+    try {
+      final wsId = selectedWorkspaceId.value;
+      if (wsId == null) {
+        // For personal workspace (no id), we might just filter locally or call a different API.
+        // For now, let's implement local filtering for personal workspace
+        final q = query.toLowerCase();
+        final matchedCollections = collections.where((c) => (c['name'] as String).toLowerCase().contains(q)).toList();
+        final matchedRequests = <dynamic>[];
+        
+        void searchRequests(List<dynamic> nodes) {
+          for (var node in nodes) {
+            if (node['requests'] != null) {
+              for (var req in node['requests']) {
+                if ((req['name'] as String).toLowerCase().contains(q) || (req['url'] as String).toLowerCase().contains(q)) {
+                  // create a copy to add collection info if needed
+                  matchedRequests.add({...req as Map, 'collectionId': {'name': node['name']}});
+                }
+              }
+            }
+            if (node['folders'] != null) {
+              searchRequests(node['folders']);
+            }
+          }
+        }
+        searchRequests(collections);
+        return {'collections': matchedCollections, 'requests': matchedRequests};
+      } else {
+        return await _apiService.searchWorkspace(wsId, query);
+      }
+    } catch (e) {
+      log('Search failed', error: e);
+      return {'collections': [], 'requests': []};
     }
   }
 
@@ -171,6 +210,31 @@ class WorkspaceController extends GetxController {
     }
 
     if (updateInList(collections)) {
+      collections.refresh();
+    }
+  }
+
+  void removeRequestLocally(String requestId) {
+    bool removeInList(List<dynamic> currentLevel) {
+      for (final node in currentLevel) {
+        if (node['requests'] != null) {
+          final initialLength = (node['requests'] as List).length;
+          node['requests'].removeWhere((req) => req['_id'] == requestId);
+          if ((node['requests'] as List).length < initialLength) {
+            return true;
+          }
+        }
+
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (removeInList(node['folders'])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    if (removeInList(collections)) {
       collections.refresh();
     }
   }
@@ -756,10 +820,33 @@ class WorkspaceController extends GetxController {
     };
   }
 
+  void removeCollectionLocally(String collectionId) {
+    bool removeInList(List<dynamic> currentLevel) {
+      final initialLength = currentLevel.length;
+      currentLevel.removeWhere((c) => c['_id'] == collectionId);
+      if (currentLevel.length < initialLength) {
+        return true;
+      }
+      
+      for (final node in currentLevel) {
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (removeInList(node['folders'])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    if (removeInList(collections)) {
+      collections.refresh();
+    }
+  }
+
   Future<void> deleteCollection(String id) async {
     try {
       await _apiService.deleteCollection(id);
-      await fetchCollections();
+      removeCollectionLocally(id);
       CustomSnackbar.show(title: 'Success', message: 'Deleted successfully');
     } catch (e, stack) {
       log(
@@ -841,10 +928,134 @@ class WorkspaceController extends GetxController {
     }
   }
 
+  Future<void> duplicateRequest(Map<String, dynamic> req) async {
+    final requestId = req['_id'];
+    String? parentId;
+    Map<String, dynamic>? parentNode;
+
+    bool findPath(List<dynamic> currentLevel) {
+      for (final node in currentLevel) {
+        if (node['requests'] != null) {
+          for (final r in node['requests']) {
+            if (r['_id'] == requestId) {
+              parentId = node['_id'];
+              parentNode = node;
+              return true;
+            }
+          }
+        }
+        if (node['folders'] != null && node['folders'].isNotEmpty) {
+          if (findPath(node['folders'])) return true;
+        }
+      }
+      return false;
+    }
+
+    findPath(collections);
+
+    if (parentId == null) {
+      CustomSnackbar.show(
+          title: 'Error', message: 'Could not find parent collection', isError: true);
+      return;
+    }
+
+    try {
+      duplicatingRequestId.value = requestId;
+      
+      final name = '${req['name']} Copy';
+      final newReq = await _apiService.createRequest(
+        parentId!,
+        name,
+        method: req['method'] ?? 'GET',
+        requestKind: req['requestKind'] ?? 'http',
+      );
+
+      final rawData = Map<String, dynamic>.from(req);
+      rawData.remove('isExpanded');
+      rawData.remove('isHovered');
+      
+      // Use jsonDecode/jsonEncode to ensure a complete deep copy without any GetX Rx variables or references
+      final updateData = jsonDecode(jsonEncode(rawData)) as Map<String, dynamic>;
+
+      updateData.remove('_id');
+      updateData.remove('createdAt');
+      updateData.remove('updatedAt');
+      updateData.remove('__v');
+      updateData.remove('savedResponses');
+      updateData.remove('collectionId');
+      updateData['name'] = name;
+
+      final updatedReq = await _apiService.updateRequest(newReq['_id'], updateData);
+      
+      if (parentNode != null && parentNode!['requests'] != null) {
+        final currentRequests = List<dynamic>.from(parentNode!['requests']);
+        
+        // Find the index of the original request to insert right after it
+        final originalIndex = currentRequests.indexWhere((r) => r['_id'] == requestId);
+        
+        if (originalIndex != -1) {
+          currentRequests.insert(originalIndex + 1, updatedReq);
+        } else {
+          currentRequests.add(updatedReq);
+        }
+        
+        parentNode!['requests'] = currentRequests;
+        collections.refresh();
+        
+        // Background sync to ensure the backend saves this precise order for future reloads
+        try {
+          final requestIds = currentRequests.map<String>((r) => r['_id'] as String).toList();
+          _apiService.reorderRequests(requestIds);
+        } catch (_) {}
+
+        CustomSnackbar.show(title: 'Success', message: 'Request duplicated');
+      } else {
+        await fetchCollections();
+        CustomSnackbar.show(title: 'Success', message: 'Request duplicated (Reloaded tree)');
+      }
+    } catch (e, stack) {
+      log('Failed to duplicate request', error: e, stackTrace: stack, name: 'WorkspaceController');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to duplicate request', isError: true);
+    } finally {
+      duplicatingRequestId.value = '';
+    }
+  }
+
+  Future<void> renameRequest(String requestId, String newName) async {
+    try {
+      await _apiService.updateRequest(requestId, {'name': newName});
+      updateRequestLocally(requestId, {'name': newName});
+      
+      try {
+        final reqBuilder = Get.find<RequestBuilderController>();
+        reqBuilder.updateOpenRequestName(requestId, newName);
+      } catch (_) {}
+    } catch (e, stack) {
+      log('Failed to rename request', error: e, stackTrace: stack, name: 'WorkspaceController');
+      CustomSnackbar.show(title: 'Error', message: 'Failed to rename request', isError: true);
+    }
+  }
+
   Future<void> deleteRequest(String id) async {
     try {
       await _apiService.deleteRequest(id);
-      await fetchCollections();
+      removeRequestLocally(id);
+      
+      // Also close it from the request builder if it's open
+      try {
+        final reqBuilder = Get.find<RequestBuilderController>();
+        if (reqBuilder.currentRequestId.value == id) {
+          reqBuilder.openRequests.removeWhere((req) => req['_id'] == id);
+          if (reqBuilder.openRequests.isNotEmpty) {
+            reqBuilder.loadRequest(reqBuilder.openRequests.last);
+          } else {
+            reqBuilder.currentRequestId.value = null;
+          }
+        } else {
+          reqBuilder.openRequests.removeWhere((req) => req['_id'] == id);
+        }
+      } catch (_) {}
+      
       CustomSnackbar.show(title: 'Success', message: 'Request deleted');
     } catch (e, stack) {
       log(
