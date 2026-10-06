@@ -248,3 +248,55 @@ exports.deleteWorkspace = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.searchWorkspace = async (req, res) => {
+  try {
+    const workspaceId = req.params.id;
+    const query = req.query.q;
+    
+    if (!query) {
+      return res.json({ collections: [], requests: [] });
+    }
+
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+
+    // Verify user is in workspace
+    const isOwner = workspace.owner.toString() === req.user.id;
+    const isMember = workspace.members.some(m => m.user.toString() === req.user.id);
+    if (!isOwner && !isMember) {
+      return res.status(403).json({ message: 'Not authorized to search in this workspace' });
+    }
+
+    const Collection = require('../models/Collection');
+    const Request = require('../models/Request');
+
+    const searchRegex = new RegExp(query, 'i');
+
+    // Search Collections (folders/collections) in this workspace
+    const collections = await Collection.find({
+      workspace: workspaceId,
+      name: searchRegex
+    }).lean();
+
+    // To search requests, we need all collections in this workspace to filter by collectionId
+    const allCollections = await Collection.find({ workspace: workspaceId }).select('_id').lean();
+    const collectionIds = allCollections.map(c => c._id);
+
+    // Search Requests in those collections
+    const requests = await Request.find({
+      collectionId: { $in: collectionIds },
+      $or: [
+        { name: searchRegex },
+        { url: searchRegex }
+      ]
+    }).populate('collectionId', 'name parentFolder').lean();
+
+    res.json({
+      collections,
+      requests
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

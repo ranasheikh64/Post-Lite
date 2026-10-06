@@ -105,15 +105,43 @@ class SocketController extends GetxController {
       }
 
       print('🚀 [SocketIO] Attempting connection to: $ioUrl');
-      print('🚀 [SocketIO] Payload -> auth (headers): $safeHeaders');
-      print('🚀 [SocketIO] Payload -> extraHeaders: $safeHeaders');
-      print('🚀 [SocketIO] Payload -> query: $safeQueryParams');
+      print('🚀 [SocketIO] Original Headers: $safeHeaders');
+      print('🚀 [SocketIO] Original Query: $safeQueryParams');
+
+      // To make this a perfect Postman clone, we should pass the auth headers
+      // in multiple ways because different Socket.io backends parse it differently!
+      final authPayload = <String, dynamic>{
+        ...safeHeaders,
+        'headers': safeHeaders,
+      };
+      
+      // Find the token case-insensitively (Authorization, authorization, Token, token)
+      String? authToken;
+      for (var key in safeHeaders.keys) {
+        if (key.toLowerCase() == 'authorization' || key.toLowerCase() == 'token') {
+          authToken = safeHeaders[key];
+          break;
+        }
+      }
+
+      // Inject the token into all common properties that Socket.IO middlewares look for
+      if (authToken != null) {
+        authPayload['Authorization'] = authToken;
+        authPayload['authorization'] = authToken;
+        authPayload['token'] = authToken;
+        // Also ensure it's in the nested headers case-insensitively
+        final nestedHeaders = authPayload['headers'] as Map<String, String>;
+        nestedHeaders['Authorization'] = authToken;
+        nestedHeaders['authorization'] = authToken;
+      }
+
+      print('🚀 [SocketIO] Final Auth Payload built: $authPayload');
 
       final options = IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
           .enableForceNew()
-          .setAuth(safeHeaders)
+          .setAuth(authPayload)
           .setExtraHeaders(safeHeaders);
           
       if (safeQueryParams.isNotEmpty) {
@@ -126,7 +154,7 @@ class SocketController extends GetxController {
         isConnected.value = true;
         isConnecting.value = false;
         messages.add(SocketMessage(
-          content: 'Connected to $ioUrl',
+          content: '✅ Successfully connected to $ioUrl',
           isSent: false,
           timestamp: DateTime.now(),
           isSystem: true,
@@ -134,9 +162,21 @@ class SocketController extends GetxController {
       });
       
       _ioSocket!.onConnectError((err) {
-        connectionError.value = err.toString();
+        String errMsg = err.toString();
+        // Try to parse standard Socket.io error object
+        if (err is Map && err.containsKey('message')) {
+          errMsg = err['message'].toString();
+        } else if (err is String && err.contains('message:')) {
+          // Fallback parsing if it's a stringified map
+          final match = RegExp(r'message:\s*([^}]+)').firstMatch(err);
+          if (match != null) {
+            errMsg = match.group(1)?.trim() ?? errMsg;
+          }
+        }
+        
+        connectionError.value = errMsg;
         messages.add(SocketMessage(
-          content: 'ConnectError: ${err.toString()}',
+          content: '❌ Connection Failed: $errMsg\n(Check if server is running, URL is correct, and Auth tokens are valid)',
           isSent: false,
           timestamp: DateTime.now(),
           isSystem: true,
@@ -146,13 +186,8 @@ class SocketController extends GetxController {
       
       _ioSocket!.on('connect_timeout', (err) {
         connectionError.value = 'timeout';
-        disconnect();
-      });
-      
-      _ioSocket!.onError((err) {
-        connectionError.value = err.toString();
         messages.add(SocketMessage(
-          content: 'Error: ${err.toString()}',
+          content: '⏱️ Connection Timeout: Server took too long to respond.',
           isSent: false,
           timestamp: DateTime.now(),
           isSystem: true,
@@ -160,9 +195,24 @@ class SocketController extends GetxController {
         disconnect();
       });
       
-      _ioSocket!.onDisconnect((_) {
+      _ioSocket!.onError((err) {
+        String errMsg = err.toString();
+        if (err is Map && err.containsKey('message')) errMsg = err['message'].toString();
+        
+        connectionError.value = errMsg;
         messages.add(SocketMessage(
-          content: 'Disconnected from $ioUrl',
+          content: '⚠️ Socket Error: $errMsg',
+          isSent: false,
+          timestamp: DateTime.now(),
+          isSystem: true,
+        ));
+        // We don't forcefully disconnect on all general errors, just log them.
+      });
+      
+      _ioSocket!.onDisconnect((reason) {
+        String reasonStr = reason.toString();
+        messages.add(SocketMessage(
+          content: '🔌 Disconnected from $ioUrl (Reason: $reasonStr)',
           isSent: false,
           timestamp: DateTime.now(),
           isSystem: true,
@@ -173,7 +223,7 @@ class SocketController extends GetxController {
       // Listen to generic messages or catch-all if possible
       _ioSocket!.onAny((event, data) {
         messages.add(SocketMessage(
-          content: data != null ? (data is String ? data : jsonEncode(data)) : '',
+          content: data != null ? (data is String ? data : jsonEncode(data)) : 'No data',
           isSent: false,
           timestamp: DateTime.now(),
           eventName: event,

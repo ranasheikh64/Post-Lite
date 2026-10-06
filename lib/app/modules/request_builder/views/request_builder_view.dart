@@ -539,40 +539,6 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
     });
   }
 
-  TextSpan _highlightJson(String jsonString) {
-    final regex = RegExp(r'("(?:\\.|[^"\\])*")\s*(:?)|([0-9\-.]+)|(true|false|null)|([{}[\]])');
-    List<TextSpan> spans = [];
-    int lastMatchEnd = 0;
-
-    for (final match in regex.allMatches(jsonString)) {
-      if (match.start > lastMatchEnd) {
-        spans.add(TextSpan(text: jsonString.substring(lastMatchEnd, match.start), style: const TextStyle(color: Colors.white)));
-      }
-
-      final text = match.group(0)!;
-      if (match.group(2) == ':') {
-        spans.add(TextSpan(text: match.group(1), style: const TextStyle(color: Color(0xFF9CDCFE)))); // VS Code Blue for keys
-        spans.add(const TextSpan(text: ':', style: TextStyle(color: Colors.white)));
-      } else if (match.group(1) != null) {
-        spans.add(TextSpan(text: text, style: const TextStyle(color: Color(0xFFCE9178)))); // VS Code Orange/Green for strings
-      } else if (match.group(3) != null) {
-        spans.add(TextSpan(text: text, style: const TextStyle(color: Color(0xFFB5CEA8)))); // VS Code light green for numbers
-      } else if (match.group(4) != null) {
-        spans.add(TextSpan(text: text, style: const TextStyle(color: Color(0xFF569CD6)))); // VS Code Blue for booleans
-      } else if (match.group(5) != null) {
-        spans.add(TextSpan(text: text, style: const TextStyle(color: Colors.white70)));
-      } else {
-        spans.add(TextSpan(text: text, style: const TextStyle(color: Colors.white)));
-      }
-      lastMatchEnd = match.end;
-    }
-
-    if (lastMatchEnd < jsonString.length) {
-      spans.add(TextSpan(text: jsonString.substring(lastMatchEnd), style: const TextStyle(color: Colors.white)));
-    }
-
-    return TextSpan(children: spans);
-  }
 
   Widget _buildResponseView(String data) {
     if (data.trim().startsWith('{') || data.trim().startsWith('[')) {
