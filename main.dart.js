@@ -107135,7 +107135,7 @@ break
 case 1:return A.u(q,r)}})
 return A.v($async$vK,r)}}
 A.arY.prototype={
-aft(){var s=A.Sn(A.abw("http://localhost:4000",B.hc,B.hc))
+aft(){var s=A.Sn(A.abw("https://post-lite-backend.vercel.app",B.hc,B.hc))
 this.a=s
 s=s.k2$
 s.C(s,new A.Ui(new A.arZ(),new A.as_(),new A.as0(),null,null,null))},
