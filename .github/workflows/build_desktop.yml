@@ -134,6 +134,7 @@ jobs:
   publish-release:
     name: Publish Release Assets
     needs: [build-macos, build-windows, build-linux]
+    if: always() && (needs.build-macos.result == 'success' || needs.build-windows.result == 'success' || needs.build-linux.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Determine Release Tag
