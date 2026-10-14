@@ -1,0 +1,170 @@
+name: Build Desktop Releases (macOS, Windows, Linux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ==========================================
+  # 1. Build macOS (.dmg & .zip)
+  # ==========================================
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build macOS Release
+        run: flutter build macos --release
+
+      - name: Package macOS App (.dmg & .zip)
+        run: |
+          cd build/macos/Build/Products/Release
+          # Create DMG
+          hdiutil create -volname "Jronix Post" -srcfolder postmanclone.app -ov -format UDZO Jronix-Post-macOS.dmg
+          # Create ZIP
+          zip -r Jronix-Post-macOS.zip postmanclone.app
+          mv Jronix-Post-macOS.dmg "${{ github.workspace }}/"
+          mv Jronix-Post-macOS.zip "${{ github.workspace }}/"
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: |
+            Jronix-Post-macOS.dmg
+            Jronix-Post-macOS.zip
+          retention-days: 2
+
+  # ==========================================
+  # 2. Build Windows (.zip)
+  # ==========================================
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      - name: Package Windows App (.zip)
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "Jronix-Post-Windows-x64.zip"
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: Jronix-Post-Windows-x64.zip
+          retention-days: 2
+
+  # ==========================================
+  # 3. Build Linux (.tar.gz)
+  # ==========================================
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Linux Release
+        run: flutter build linux --release
+
+      - name: Package Linux App (.tar.gz)
+        run: |
+          tar -czvf Jronix-Post-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: Jronix-Post-Linux-x64.tar.gz
+          retention-days: 2
+
+  # ==========================================
+  # 4. Create / Update GitHub Release
+  # ==========================================
+  publish-release:
+    name: Publish Release Assets
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine Release Tag
+        id: tag_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG="v1.0.0"
+          fi
+          echo "release_tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_info.outputs.release_tag }}
+          name: "Jronix Post ${{ steps.tag_info.outputs.release_tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release-assets/Jronix-Post-macOS.dmg
+            release-assets/Jronix-Post-macOS.zip
+            release-assets/Jronix-Post-Windows-x64.zip
+            release-assets/Jronix-Post-Linux-x64.tar.gz
