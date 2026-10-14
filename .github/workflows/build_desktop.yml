@@ -40,10 +40,15 @@ jobs:
       - name: Package macOS App (.dmg & .zip)
         run: |
           cd build/macos/Build/Products/Release
-          # Create DMG
-          hdiutil create -volname "Jronix Post" -srcfolder postmanclone.app -ov -format UDZO Jronix-Post-macOS.dmg
-          # Create ZIP
-          zip -r Jronix-Post-macOS.zip postmanclone.app
+          APP_NAME=$(find . -maxdepth 1 -name "*.app" -print -quit)
+          echo "Found application: $APP_NAME"
+          # Clear any extended quarantine attributes and ad-hoc sign
+          xattr -cr "$APP_NAME" || true
+          codesign --force --deep --sign - "$APP_NAME" || true
+          
+          # Create DMG and ZIP
+          hdiutil create -volname "Jronix Post" -srcfolder "$APP_NAME" -ov -format UDZO Jronix-Post-macOS.dmg
+          zip -r Jronix-Post-macOS.zip "$APP_NAME"
           mv Jronix-Post-macOS.dmg "${{ github.workspace }}/"
           mv Jronix-Post-macOS.zip "${{ github.workspace }}/"
 
