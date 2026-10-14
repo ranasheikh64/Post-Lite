@@ -133,6 +133,18 @@ jobs:
 
       - name: Package Linux App (.tar.gz)
         run: |
+          cat << 'EOF' > build/linux/x64/release/bundle/jronixpost.desktop
+[Desktop Entry]
+Name=Jronix Post
+Comment=Next-gen API, Socket.IO & WebSocket Client
+Exec=./jronixpost
+Icon=jronixpost
+Terminal=false
+Type=Application
+Categories=Development;
+EOF
+          cp assets/icons/main_logo.png build/linux/x64/release/bundle/jronixpost.png
+          chmod +x build/linux/x64/release/bundle/jronixpost || true
           tar -czvf Jronix-Post-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
 
       - name: Upload Linux Artifacts

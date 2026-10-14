@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "postmanclone" "\0"
+            VALUE "CompanyName", "Jronix" "\0"
+            VALUE "FileDescription", "Jronix Post" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "postmanclone" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "postmanclone.exe" "\0"
-            VALUE "ProductName", "postmanclone" "\0"
+            VALUE "InternalName", "Jronix Post" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Jronix. All rights reserved." "\0"
+            VALUE "OriginalFilename", "jronixpost.exe" "\0"
+            VALUE "ProductName", "Jronix Post" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
