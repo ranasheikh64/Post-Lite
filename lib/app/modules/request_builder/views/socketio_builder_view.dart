@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +10,10 @@ import 'package:postmanclone/app/modules/request_builder/controllers/request_bui
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
 import 'package:postmanclone/app/modules/request_builder/widgets/events_table_view.dart'; // For EventsTableView
+import '../widgets/syntax_highlighting_controller.dart';
+import '../widgets/beautify_button.dart';
+import '../widgets/code_formatter.dart';
+import '../widgets/comment_toggle_helper.dart';
 
 class SocketIOBuilderView extends StatefulWidget {
   const SocketIOBuilderView({super.key});
@@ -26,10 +30,21 @@ class CommentIntent extends Intent {
 class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
   final RequestBuilderController reqController =
       Get.find<RequestBuilderController>();
-  final TextEditingController messageController = TextEditingController();
+  late final SyntaxHighlightingController messageController =
+      SyntaxHighlightingController(format: 'json');
   final TextEditingController eventController = TextEditingController();
   final RxDouble topHeight = 400.0.obs;
   final RxBool isAck = false.obs;
+  bool _isBeautified = false;
+  Timer? _beautifyTimer;
+
+  String _extractRaw(dynamic bodyVal) {
+    if (bodyVal == null) return '';
+    if (bodyVal is Map && bodyVal['raw'] != null) {
+      return _extractRaw(bodyVal['raw']);
+    }
+    return bodyVal.toString();
+  }
   
   List<String> savedEvents = [];
   final FocusNode _eventFocusNode = FocusNode();
@@ -69,11 +84,9 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     }
     
     // Load saved payload
-    final bodyVal = reqController.body.value;
-    if (bodyVal is Map && bodyVal['raw'] != null) {
-      messageController.text = bodyVal['raw'].toString();
-    } else if (bodyVal is String) {
-      messageController.text = bodyVal;
+    final rawText = _extractRaw(reqController.body.value);
+    if (rawText.isNotEmpty) {
+      messageController.text = rawText;
     }
     
     // Load saved event name
@@ -84,14 +97,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     
     // Save on change
     messageController.addListener(() {
-      final b = reqController.body.value;
-      if (b is Map) {
-        final newBody = Map<String, dynamic>.from(b);
-        newBody['raw'] = messageController.text;
-        reqController.body.value = newBody;
-      } else {
-        reqController.body.value = {'raw': messageController.text};
-      }
+      reqController.body.value = messageController.text;
     });
     
     eventController.addListener(() {
@@ -102,56 +108,40 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
   }
 
   void _toggleComment() {
-    final text = messageController.text;
-    final selection = messageController.selection;
-    if (selection.baseOffset == -1) return;
-    
-    final start = selection.start;
-    final end = selection.end;
-    
-    final before = text.substring(0, start);
-    final after = text.substring(end);
-    
-    final lineStart = before.lastIndexOf('\n') + 1;
-    final lineEndIndex = after.indexOf('\n');
-    final lineEnd = lineEndIndex != -1 ? end + lineEndIndex : text.length;
-    
-    final selectedLinesText = text.substring(lineStart, lineEnd);
-    final lines = selectedLinesText.split('\n');
-    
-    // Check if ALL lines (that are not empty) are commented
-    final allCommented = lines.where((l) => l.trim().isNotEmpty).every((line) => line.trimLeft().startsWith('//'));
-    
-    final newLines = lines.map((line) {
-      if (line.trim().isEmpty) return line;
-      if (allCommented) {
-        if (line.trimLeft().startsWith('//')) {
-          return line.replaceFirst('//', '');
-        }
-        return line;
-      } else {
-        return '//$line';
+    final updated = CommentToggleHelper.toggle(messageController.value);
+    if (updated != null) {
+      setState(() => messageController.value = updated);
+      reqController.body.value = updated.text;
+      reqController.hasUnsavedChanges.value = true;
+    }
+  }
+
+  void _beautify() {
+    final raw = messageController.text;
+    if (raw.trim().isEmpty) return;
+    try {
+      final formatted = CodeFormatter.format(text: raw, format: 'json');
+      if (formatted != null && formatted != raw) {
+        _beautifyTimer?.cancel();
+        setState(() {
+          messageController.text = formatted;
+          _isBeautified = true;
+        });
+        reqController.body.value = formatted;
+        reqController.hasUnsavedChanges.value = true;
+        _beautifyTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _isBeautified = false);
+        });
       }
-    }).toList();
-    
-    final newSelectedLinesText = newLines.join('\n');
-    final newText = text.substring(0, lineStart) + newSelectedLinesText + text.substring(lineEnd);
-    
-    final lengthDiff = newSelectedLinesText.length - selectedLinesText.length;
-    
-    messageController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection(
-        baseOffset: start,
-        extentOffset: (end + lengthDiff).clamp(0, newText.length),
-      ),
-    );
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    // Do NOT disconnect or delete the controller here, so connections persist in the background
-    // when switching between different Socket.IO requests.
+    _beautifyTimer?.cancel();
+    messageController.dispose();
+    eventController.dispose();
+    _eventFocusNode.dispose();
     super.dispose();
   }
 
@@ -293,29 +283,38 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
             children: [
               Expanded(
                 child: Container(
-                  height: 40,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    border: Border.all(color: Colors.grey[800]!),
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFF1E2030),
+                    border: Border.all(color: const Color(0xFF2D3142)),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text(
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF6C37).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
                           'IO',
                           style: TextStyle(
-                            color: Colors.orange,
+                            color: Color(0xFFFF6C37),
                             fontWeight: FontWeight.bold,
+                            fontSize: 12,
                           ),
                         ),
                       ),
                       VerticalDivider(
                         color: Colors.grey[800],
-                        width: 1,
-                        indent: 6,
-                        endIndent: 6,
+                        width: 16,
+                        indent: 8,
+                        endIndent: 8,
                       ),
                       Expanded(
                         child: TextField(
@@ -331,7 +330,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                             ),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12,
+                              horizontal: 8,
                               vertical: 12,
                             ),
                             isDense: true,
@@ -344,16 +343,17 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
               ),
               const SizedBox(width: 8),
               SizedBox(
-                height: 40,
+                height: 44,
                 child: Obx(
                   () => ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: socketController.isConnected.value
-                          ? Colors.red
+                          ? const Color(0xFFE53935)
                           : const Color(0xFF2563EB),
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                     ),
@@ -406,8 +406,9 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                 return Obx(() {
                   double h = topHeight.value;
                   if (h < 150) h = 150;
-                  if (h > constraints.maxHeight - 150)
+                  if (h > constraints.maxHeight - 150) {
                     h = constraints.maxHeight - 150;
+                  }
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -425,9 +426,9 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                 isScrollable: true,
                                 tabAlignment: TabAlignment.start,
                                 dividerColor: Colors.transparent,
-                                indicatorColor: Colors.orange,
+                                indicatorColor: Color(0xFFFF6C37),
                                 indicatorWeight: 2,
-                                labelColor: Colors.white,
+                                labelColor: Color(0xFFFF6C37),
                                 unselectedLabelColor: Colors.grey,
                                 labelStyle: TextStyle(
                                   fontSize: 13,
@@ -473,7 +474,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                     Container(
                                       decoration: BoxDecoration(
                                         border: Border.all(
-                                          color: Colors.grey[800]!,
+                                          color: const Color(0xFF2D3142),
                                         ),
                                         borderRadius: const BorderRadius.only(
                                           bottomLeft: Radius.circular(8),
@@ -484,68 +485,105 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                         children: [
                                           Container(
                                             padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
+                                              horizontal: 10,
                                               vertical: 4,
                                             ),
-                                            color: Colors.grey[900],
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF181A25),
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: Radius.circular(8),
+                                                topRight: Radius.circular(8),
+                                              ),
+                                            ),
                                             child: Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.spaceBetween,
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
                                               children: [
                                                 const Text(
                                                   'Payload',
                                                   style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.grey,
+                                                    color: Color(0xFFA0A5B5),
+                                                    fontWeight: FontWeight.w500,
                                                   ),
+                                                ),
+                                                BeautifyButton(
+                                                  onPressed: _beautify,
+                                                  isBeautified: _isBeautified,
                                                 ),
                                               ],
                                             ),
                                           ),
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.all(8.0),
+                                              padding: const EdgeInsets.all(
+                                                8.0,
+                                              ),
                                               child: Column(
                                                 children: [
                                                   Expanded(
-                                                    child: Shortcuts(
-                                                      shortcuts: <LogicalKeySet, Intent>{
-                                                        LogicalKeySet(
-                                                          defaultTargetPlatform == TargetPlatform.macOS
-                                                              ? LogicalKeyboardKey.meta
-                                                              : LogicalKeyboardKey.control,
-                                                          LogicalKeyboardKey.slash,
-                                                        ): const CommentIntent(),
+                                                    child: CallbackShortcuts(
+                                                      bindings: {
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .slash,
+                                                          control: true,
+                                                        ): _toggleComment,
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .slash,
+                                                          meta: true,
+                                                        ): _toggleComment,
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .keyB,
+                                                          control: true,
+                                                          shift: true,
+                                                        ): _beautify,
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .keyB,
+                                                          meta: true,
+                                                          shift: true,
+                                                        ): _beautify,
                                                       },
-                                                      child: Actions(
-                                                        actions: <Type, Action<Intent>>{
-                                                          CommentIntent: CallbackAction<CommentIntent>(
-                                                            onInvoke: (CommentIntent intent) {
-                                                              _toggleComment();
-                                                              return null;
-                                                            },
-                                                          ),
+                                                      child: TextField(
+                                                        controller:
+                                                            messageController,
+                                                        onChanged: (val) {
+                                                          if (_isBeautified) {
+                                                            setState(
+                                                              () =>
+                                                                  _isBeautified =
+                                                                      false,
+                                                            );
+                                                          }
                                                         },
-                                                        child: TextField(
-                                                          controller: messageController,
-                                                          maxLines: null,
-                                                          expands: true,
-                                                          textAlignVertical:
-                                                              TextAlignVertical.top,
-                                                          style: const TextStyle(
-                                                            fontFamily: 'monospace',
-                                                            fontSize: 13,
-                                                          ),
-                                                          decoration: const InputDecoration(
-                                                            hoverColor:
-                                                                Colors.transparent,
-                                                            filled: false,
-                                                            hintText:
-                                                                'Enter JSON payload...',
-                                                            border: InputBorder.none,
-                                                            isDense: true,
+                                                        maxLines: null,
+                                                        expands: true,
+                                                        textAlignVertical:
+                                                            TextAlignVertical
+                                                                .top,
+                                                        style: const TextStyle(
+                                                          fontFamily:
+                                                              'monospace',
+                                                          fontSize: 13,
+                                                          color: Color(
+                                                            0xFFD4D4D4,
                                                           ),
                                                         ),
+                                                        decoration:
+                                                            const InputDecoration(
+                                                              hoverColor: Colors
+                                                                  .transparent,
+                                                              filled: false,
+                                                              hintText:
+                                                                  'Enter JSON payload...',
+                                                              border: InputBorder
+                                                                  .none,
+                                                              isDense: true,
+                                                            ),
                                                       ),
                                                     ),
                                                   ),
@@ -703,21 +741,45 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                       MouseRegion(
                         cursor: SystemMouseCursors.resizeUpDown,
                         child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
                           onPanUpdate: (details) {
                             topHeight.value += details.delta.dy;
                           },
                           child: Container(
-                            height: 16,
-                            color: Colors.transparent,
-                            child: Center(
-                              child: Container(
-                                height: 4,
-                                width: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[700],
-                                  borderRadius: BorderRadius.circular(2),
+                            height: 20,
+                            alignment: Alignment.center,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Divider(height: 1, color: Colors.grey[800]),
+                                Container(
+                                  width: 56,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF242736),
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(
+                                      color: const Color(0xFF383B4F),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.drag_handle_rounded,
+                                      size: 15,
+                                      color: Color(0xFF9EA3C0),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ),
@@ -825,7 +887,7 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                       decoration: BoxDecoration(
-                                                        color: const Color(0xFF2E3B51).withOpacity(0.5),
+                                                        color: const Color(0xFF2E3B51).withValues(alpha: 0.5),
                                                         border: Border.all(color: const Color(0xFF3F4F6A)),
                                                         borderRadius: BorderRadius.circular(4),
                                                       ),

@@ -6,9 +6,9 @@ String _avatarInitials(Map member) {
   final name = member['user']['name'] as String? ?? '';
   final email = member['user']['email'] as String? ?? '';
   final source = name.isNotEmpty ? name : email;
-  final parts = source.trim().split(RegExp(r'[\s@.]'));
+  final parts = source.trim().split(RegExp(r'[\s@.]')).where((p) => p.isNotEmpty).toList();
   if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  if (source.isNotEmpty) return source[0].toUpperCase();
+  if (parts.length == 1) return parts[0][0].toUpperCase();
   return '?';
 }
 

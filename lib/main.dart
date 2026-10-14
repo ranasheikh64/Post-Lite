@@ -78,7 +78,7 @@ void main() async {
 
   runApp(
     GetMaterialApp(
-      title: 'Jronix API Client',
+      title: 'Jronix Post',
       theme: AppTheme.darkTheme,
       initialRoute: initialRoute,
       getPages: AppPages.pages,

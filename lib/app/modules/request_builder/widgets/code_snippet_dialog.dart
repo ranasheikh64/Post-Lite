@@ -22,7 +22,7 @@ void showCodeSnippetSidePanel(BuildContext context, RequestBuilderController con
               border: Border(left: BorderSide(color: Colors.grey[800]!)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
+                  color: Colors.black.withValues(alpha: 0.4),
                   blurRadius: 15,
                   offset: const Offset(-5, 0),
                 )
@@ -178,8 +178,25 @@ class _CodeSnippetSidebarState extends State<CodeSnippetSidebar> {
     String? bodyData;
     if (c.bodyType.value == 'raw') {
       bodyData = c.body.value;
-      if (c.bodyFormat.value == 'json') {
-        headers['Content-Type'] = 'application/json';
+      final format = c.bodyFormat.value.toLowerCase();
+      if (!headers.keys.any((k) => k.toLowerCase() == 'content-type')) {
+        switch (format) {
+          case 'json':
+            headers['Content-Type'] = 'application/json';
+            break;
+          case 'xml':
+            headers['Content-Type'] = 'application/xml';
+            break;
+          case 'html':
+            headers['Content-Type'] = 'text/html';
+            break;
+          case 'javascript':
+            headers['Content-Type'] = 'application/javascript';
+            break;
+          default:
+            headers['Content-Type'] = 'text/plain';
+            break;
+        }
       }
     } else if (c.bodyType.value == 'form-data') {
       bodyData = '// form-data snippet generation is not fully implemented yet.';

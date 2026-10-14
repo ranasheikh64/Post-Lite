@@ -41,6 +41,29 @@ class WorkspaceController extends GetxController {
   final selectedCollectionIds = <String>{}.obs;
   final selectedRequestIds = <String>{}.obs;
 
+  // -- Track which root collections are expanded (for sticky pinned headers) --
+  final expandedCollectionIds = <String>{}.obs;
+
+  bool isCollectionExpanded(String id) {
+    return expandedCollectionIds.contains(id);
+  }
+
+  void toggleCollectionExpanded(String id) {
+    if (expandedCollectionIds.contains(id)) {
+      expandedCollectionIds.remove(id);
+    } else {
+      expandedCollectionIds.add(id);
+    }
+  }
+
+  void expandCollection(String id) {
+    expandedCollectionIds.add(id);
+  }
+
+  void collapseCollection(String id) {
+    expandedCollectionIds.remove(id);
+  }
+
   void toggleSelectionMode() {
     isSelectionMode.value = !isSelectionMode.value;
     if (!isSelectionMode.value) {
@@ -616,6 +639,9 @@ class WorkspaceController extends GetxController {
         workspaceId: selectedWorkspaceId.value,
       );
       collections.value = data;
+      if (expandedCollectionIds.isEmpty && data.isNotEmpty) {
+        expandedCollectionIds.add(data.first['_id']);
+      }
     } catch (e, stack) {
       log(
         'Failed to fetch collections',

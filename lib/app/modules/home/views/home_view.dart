@@ -44,39 +44,86 @@ class HomeView extends GetView<WorkspaceController> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.view_sidebar_outlined),
-            tooltip: 'Toggle Sidebar',
-            onPressed: workspaceController.toggleSidebar,
-          ),
-          title: Row(
-            children: [
-              Image.asset('assets/icons/main_logo.png', height: 36),
-              const SizedBox(width: 12),
-              const Text(
-                'Jronix Post',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  letterSpacing: 0.5,
-                ),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1C27),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFF2A2D3E), width: 1),
               ),
-              const Spacer(),
-              // Global Search Box
-              const SizedBox(width: 400, child: GlobalSearchWidget()),
-              const Spacer(),
-            ],
-          ),
-
-          actions: [
-            IconButton(icon: const Icon(Icons.sync), onPressed: () {}),
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () => Get.toNamed(Routes.SETTINGS),
             ),
-            const SizedBox(width: 16),
-          ],
+            child: Row(
+              children: [
+                // Sidebar toggle
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: workspaceController.toggleSidebar,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      child: Icon(
+                        Icons.menu_rounded,
+                        size: 20,
+                        color: Color(0xFF9E9E9E),
+                      ),
+                    ),
+                  ),
+                ),
+                // Logo + App name
+                Image.asset('assets/icons/main_logo.png', height: 28),
+                const SizedBox(width: 8),
+                const Text(
+                  'Jronix Post',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    letterSpacing: 0.3,
+                    color: Color(0xFFE0E0E0),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // Global Search Box
+                const Expanded(
+                  child: Center(
+                    child: SizedBox(width: 420, child: GlobalSearchWidget()),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // Actions
+                Tooltip(
+                  message: 'Sync',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {},
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                        child: Icon(Icons.sync_rounded, size: 18, color: Color(0xFF9E9E9E)),
+                      ),
+                    ),
+                  ),
+                ),
+                Tooltip(
+                  message: 'Settings',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Get.toNamed(Routes.SETTINGS),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                        child: Icon(Icons.settings_outlined, size: 18, color: Color(0xFF9E9E9E)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+          ),
         ),
         body: Row(
           children: [
@@ -96,28 +143,26 @@ class HomeView extends GetView<WorkspaceController> {
                     maxWidth: workspaceController.sidebarWidth.value,
                     alignment: Alignment.topLeft,
                     child: Material(
-                      color: Theme.of(context).cardColor,
+                      color: const Color(0xFF181A25),
                       child: Column(
                         children: [
                           // Workspace Switcher
                           Obx(
                             () => Container(
-                              padding: const EdgeInsets.all(16.0),
-                              decoration: BoxDecoration(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: const BoxDecoration(
                                 border: Border(
-                                  bottom: BorderSide(
-                                    color: Colors.grey.withOpacity(0.2),
-                                  ),
+                                  bottom: BorderSide(color: Color(0xFF2A2D3E)),
                                 ),
                               ),
                               child: Row(
                                 children: [
                                   const Icon(
                                     Icons.workspaces_outline,
-                                    size: 20,
+                                    size: 16,
                                     color: AppTheme.textSecondary,
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: DropdownButtonHideUnderline(
                                       child: DropdownButton<String?>(
@@ -129,8 +174,8 @@ class HomeView extends GetView<WorkspaceController> {
                                         hint: const Text(
                                           'Personal Workspace',
                                           style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
                                           ),
                                         ),
                                         items: [
@@ -139,8 +184,8 @@ class HomeView extends GetView<WorkspaceController> {
                                             child: Text(
                                               'Personal Workspace',
                                               style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
                                               ),
                                             ),
                                           ),
@@ -150,8 +195,8 @@ class HomeView extends GetView<WorkspaceController> {
                                               child: Text(
                                                 ws['name'],
                                                 style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13,
                                                 ),
                                               ),
                                             ),
@@ -179,8 +224,8 @@ class HomeView extends GetView<WorkspaceController> {
                                               'admin'))
                                     IconButton(
                                       icon: const Icon(
-                                        Icons.settings,
-                                        size: 18,
+                                        Icons.settings_outlined,
+                                        size: 16,
                                       ),
                                       tooltip: 'Manage Team',
                                       padding: EdgeInsets.zero,
@@ -197,7 +242,7 @@ class HomeView extends GetView<WorkspaceController> {
                                     IconButton(
                                       icon: const Icon(
                                         Icons.group_add,
-                                        size: 18,
+                                        size: 16,
                                       ),
                                       tooltip: 'Create Team',
                                       padding: EdgeInsets.zero,
@@ -212,7 +257,7 @@ class HomeView extends GetView<WorkspaceController> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -223,7 +268,10 @@ class HomeView extends GetView<WorkspaceController> {
                                           ? '${workspaceController.selectedCollectionIds.length + workspaceController.selectedRequestIds.length} selected'
                                           : 'Collections',
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        letterSpacing: 0.5,
+                                        color: Color(0xFF9E9E9E),
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -428,17 +476,19 @@ class HomeView extends GetView<WorkspaceController> {
                                   child: Text('No collections yet.'),
                                 );
                               }
-                              return ListView.builder(
-                                itemCount:
-                                    workspaceController.collections.length,
-                                itemBuilder: (context, index) {
-                                  return _buildCollectionNode(
-                                    context,
-                                    workspaceController.collections[index],
-                                    workspaceController.collections,
-                                    0,
-                                  );
-                                },
+                              return CustomScrollView(
+                                slivers: [
+                                  for (int index = 0;
+                                      index <
+                                          workspaceController
+                                              .collections.length;
+                                      index++)
+                                    _buildRootCollectionSliver(
+                                      context,
+                                      workspaceController.collections[index],
+                                      workspaceController.collections,
+                                    ),
+                                ],
                               );
                             }),
                           ),
@@ -527,6 +577,459 @@ class HomeView extends GetView<WorkspaceController> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRootCollectionSliver(
+    BuildContext context,
+    dynamic collection,
+    List<dynamic> parentList,
+  ) {
+    final collectionId = collection['_id'];
+    return Obx(() {
+      final isExpanded = workspaceController.isCollectionExpanded(collectionId);
+      final folders = (collection['folders'] as List?) ?? [];
+      final requests = (collection['requests'] as List?) ?? [];
+      final currentPath = 'Workspace > ${collection['name']}';
+
+      return SliverMainAxisGroup(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _CollectionHeaderDelegate(
+              height: 48.0,
+              builder: (ctx, isPinned) {
+                return _buildCollectionHeaderTile(
+                  ctx,
+                  collection,
+                  parentList,
+                  isExpanded,
+                  isPinned,
+                );
+              },
+            ),
+          ),
+          if (isExpanded)
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Render sub-folders
+                  ...folders.map(
+                    (f) => _buildCollectionNode(
+                      context,
+                      f,
+                      folders,
+                      1,
+                      parentPath: currentPath,
+                    ),
+                  ),
+                  // Render requests with ReorderableListView
+                  if (requests.isNotEmpty)
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      buildDefaultDragHandles: false,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: requests.length,
+                      onReorder: (oldIndex, newIndex) {
+                        workspaceController.reorderRequests(
+                          requests,
+                          oldIndex,
+                          newIndex,
+                        );
+                      },
+                      itemBuilder: (context, idx) {
+                        final req = requests[idx];
+                        return _buildRequestItem(
+                          req,
+                          requests,
+                          0,
+                          ValueKey(req['_id']),
+                          currentPath,
+                          idx,
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildCollectionHeaderTile(
+    BuildContext context,
+    dynamic collection,
+    List<dynamic> parentList,
+    bool isExpanded,
+    bool isPinned,
+  ) {
+    final requests = collection['requests'] ?? [];
+    final collectionId = collection['_id'];
+
+    return Dismissible(
+      key: ValueKey('collection_root_${collection['_id']}'),
+      direction: workspaceController.userRoleInWorkspace.value == 'viewer'
+          ? DismissDirection.none
+          : DismissDirection.endToStart,
+      background: Container(
+        color: Colors.redAccent,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16.0),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      confirmDismiss: (direction) async {
+        return await _confirmDelete(
+          context,
+          collection['name'] ?? 'Collection',
+        );
+      },
+      onDismissed: (direction) {
+        parentList.remove(collection);
+        workspaceController.collections.refresh();
+        workspaceController.deleteCollection(collection['_id']);
+      },
+      child: Material(
+        color: isPinned ? const Color(0xFF1C1F2E) : const Color(0xFF151722),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: isPinned ? const Color(0xFF1C1F2E) : const Color(0xFF151722),
+            border: Border(
+              bottom: BorderSide(
+                color: isPinned ? const Color(0xFF2A2D3E) : Colors.white10,
+                width: isPinned ? 1.0 : 0.5,
+              ),
+              left: BorderSide(
+                color: isPinned ? const Color(0xFFFF6C37) : Colors.transparent,
+                width: isPinned ? 2.0 : 0,
+              ),
+            ),
+            boxShadow: isPinned
+                ? const [
+                    BoxShadow(
+                      color: Colors.black38,
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: InkWell(
+            onTap: () {
+              workspaceController.toggleCollectionExpanded(collectionId);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Obx(() {
+                    if (!workspaceController.isSelectionMode.value) {
+                      return const SizedBox.shrink();
+                    }
+                    return Checkbox(
+                      value: workspaceController.selectedCollectionIds.contains(
+                        collectionId,
+                      ),
+                      onChanged: (val) {
+                        workspaceController.toggleCollectionSelection(
+                          collectionId,
+                        );
+                      },
+                    );
+                  }),
+                  Icon(
+                    isExpanded
+                        ? Icons.folder_open_outlined
+                        : Icons.folder_outlined,
+                    color: isExpanded
+                        ? const Color(0xFFFF6C37)
+                        : AppTheme.textSecondary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            collection['name'] ?? 'Unnamed',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isExpanded
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: isExpanded ? Colors.white : Colors.white70,
+                            ),
+                          ),
+                        ),
+                        if (requests.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[850],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${requests.length}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.white54,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Obx(() {
+                    if (workspaceController.userRoleInWorkspace.value ==
+                        'viewer') {
+                      return const SizedBox.shrink();
+                    }
+                    return _buildCollectionPopupMenu(
+                      context,
+                      collection,
+                      depth: 0,
+                    );
+                  }),
+                  const SizedBox(width: 4),
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: isExpanded
+                        ? const Color(0xFFFF6C37)
+                        : Colors.white54,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollectionPopupMenu(
+    BuildContext context,
+    dynamic collection, {
+    required int depth,
+  }) {
+    return PopupMenuButton<String>(
+      icon: const Icon(
+        Icons.more_vert,
+        size: 18,
+        color: AppTheme.textSecondary,
+      ),
+      padding: EdgeInsets.zero,
+      splashRadius: 20,
+      tooltip: 'Options',
+      color: const Color(0xFF2A2D3E),
+      onSelected: (value) {
+        if (value == 'add_folder') {
+          showAddFolderDialog(
+            context,
+            collection['_id'],
+            workspaceController,
+          );
+        } else if (value == 'add_request_http') {
+          showAddRequestDialog(
+            context,
+            defaultCollectionId: collection['_id'],
+            workspaceController: workspaceController,
+            defaultKind: 'http',
+          );
+        } else if (value == 'add_request_ws') {
+          showAddRequestDialog(
+            context,
+            defaultCollectionId: collection['_id'],
+            workspaceController: workspaceController,
+            defaultKind: 'websocket',
+          );
+        } else if (value == 'add_request_io') {
+          showAddRequestDialog(
+            context,
+            defaultCollectionId: collection['_id'],
+            workspaceController: workspaceController,
+            defaultKind: 'socketio',
+          );
+        } else if (value == 'variables') {
+          showVariablesDialog(
+            context,
+            collection,
+            workspaceController,
+          );
+        } else if (value == 'transfer') {
+          showTransferDialog(
+            context,
+            collection,
+            workspaceController,
+          );
+        } else if (value == 'export') {
+          workspaceController.exportCollection(collection);
+        } else if (value == 'delete') {
+          DialogHelper.showConfirmationDialog(
+            title: 'Delete Collection',
+            message:
+                'Are you sure you want to delete ${collection['name']}? This action cannot be undone.',
+            confirmText: 'Delete',
+            isDestructive: true,
+            onConfirm: () {
+              workspaceController.deleteCollection(
+                collection['_id'],
+              );
+            },
+          );
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'add_request_http',
+          child: Row(
+            children: [
+              Icon(
+                Icons.http,
+                size: 16,
+                color: Colors.blue,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Add HTTP Request',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'add_request_ws',
+          child: Row(
+            children: [
+              Icon(
+                Icons.swap_calls,
+                size: 16,
+                color: Colors.purple,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Add WebSocket Request',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'add_request_io',
+          child: Row(
+            children: [
+              Icon(
+                Icons.sensors,
+                size: 16,
+                color: Colors.orange,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Add Socket.IO Request',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'add_folder',
+          child: Row(
+            children: [
+              Icon(
+                Icons.create_new_folder_outlined,
+                size: 16,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Add Folder',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        if (depth == 0) ...[
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            value: 'variables',
+            child: Row(
+              children: [
+                Icon(Icons.tune, size: 16),
+                SizedBox(width: 8),
+                Text(
+                  'Variables',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'transfer',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.drive_file_move_outline,
+                  size: 16,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Transfer to Team',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'export',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.file_download_outlined,
+                  size: 16,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Export Collection',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete_outline,
+                size: 16,
+                color: Colors.red,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Delete',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -632,211 +1135,10 @@ class HomeView extends GetView<WorkspaceController> {
                   () =>
                       workspaceController.userRoleInWorkspace.value == 'viewer'
                       ? const SizedBox.shrink()
-                      : PopupMenuButton<String>(
-                          icon: const Icon(
-                            Icons.more_vert,
-                            size: 18,
-                            color: AppTheme.textSecondary,
-                          ),
-                          padding: EdgeInsets.zero,
-                          splashRadius: 20,
-                          tooltip: 'Options',
-                          color: const Color(0xFF2A2D3E),
-                          onSelected: (value) {
-                            if (value == 'add_folder') {
-                              showAddFolderDialog(
-                                context,
-                                collection['_id'],
-                                workspaceController,
-                              );
-                            } else if (value == 'add_request_http') {
-                              showAddRequestDialog(
-                                context,
-                                defaultCollectionId: collection['_id'],
-                                workspaceController: workspaceController,
-                                defaultKind: 'http',
-                              );
-                            } else if (value == 'add_request_ws') {
-                              showAddRequestDialog(
-                                context,
-                                defaultCollectionId: collection['_id'],
-                                workspaceController: workspaceController,
-                                defaultKind: 'websocket',
-                              );
-                            } else if (value == 'add_request_io') {
-                              showAddRequestDialog(
-                                context,
-                                defaultCollectionId: collection['_id'],
-                                workspaceController: workspaceController,
-                                defaultKind: 'socketio',
-                              );
-                            } else if (value == 'variables') {
-                              showVariablesDialog(
-                                context,
-                                collection,
-                                workspaceController,
-                              );
-                            } else if (value == 'transfer') {
-                              showTransferDialog(
-                                context,
-                                collection,
-                                workspaceController,
-                              );
-                            } else if (value == 'export') {
-                              workspaceController.exportCollection(collection);
-                            } else if (value == 'delete') {
-                              DialogHelper.showConfirmationDialog(
-                                title: 'Delete Collection',
-                                message: 'Are you sure you want to delete ${collection['name']}? This action cannot be undone.',
-                                confirmText: 'Delete',
-                                isDestructive: true,
-                                onConfirm: () {
-                                  workspaceController.deleteCollection(
-                                    collection['_id'],
-                                  );
-                                },
-                              );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'add_request_http',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.http,
-                                    size: 16,
-                                    color: Colors.blue,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Add HTTP Request',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'add_request_ws',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.swap_calls,
-                                    size: 16,
-                                    color: Colors.purple,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Add WebSocket Request',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'add_request_io',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.sensors,
-                                    size: 16,
-                                    color: Colors.orange,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Add Socket.IO Request',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuDivider(),
-                            const PopupMenuItem(
-                              value: 'add_folder',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.create_new_folder_outlined,
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Add Folder',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (depth == 0) ...[
-                              const PopupMenuDivider(),
-                              const PopupMenuItem(
-                                value: 'variables',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.tune, size: 16),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Variables',
-                                      style: TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'transfer',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.drive_file_move_outline,
-                                      size: 16,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Transfer to Team',
-                                      style: TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'export',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.file_download_outlined,
-                                      size: 16,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Export Collection',
-                                      style: TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            const PopupMenuDivider(),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete_outline,
-                                    size: 16,
-                                    color: Colors.red,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                      : _buildCollectionPopupMenu(
+                          context,
+                          collection,
+                          depth: depth,
                         ),
                 ),
               ],
@@ -928,249 +1230,269 @@ class HomeView extends GetView<WorkspaceController> {
                   workspaceController.collections.refresh();
                   workspaceController.deleteRequest(req['_id']);
                 },
-                child: ListTile(
-                  selected: isSelected,
-                  selectedTileColor: Colors.white.withOpacity(0.05),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  contentPadding: EdgeInsets.only(
-                    left: 40.0 + (depth * 16.0),
-                    right: 16.0,
-                  ),
-                  title: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (workspaceController.isSelectionMode.value)
-                          Checkbox(
-                            value: workspaceController.selectedRequestIds
-                                .contains(req['_id']),
-                            onChanged: (val) {
-                              workspaceController.toggleRequestSelection(
-                                req['_id'],
+                child: Material(
+                  color: isSelected
+                      ? const Color(0xFF1E2133)
+                      : Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      if (workspaceController.isSelectionMode.value) {
+                        workspaceController.toggleRequestSelection(req['_id']);
+                      } else {
+                        if (reqBuilder.hasUnsavedChanges.value &&
+                            reqBuilder.currentRequestId.value != req['_id']) {
+                          Get.defaultDialog(
+                            title: 'Unsaved Changes',
+                            middleText:
+                                'You have unsaved changes. Save before switching?',
+                            textConfirm: 'Save',
+                            textCancel: 'Discard',
+                            confirmTextColor: Colors.white,
+                            buttonColor: Colors.blue,
+                            onConfirm: () async {
+                              await reqBuilder.saveChanges();
+                              Get.back();
+                              reqBuilder.loadRequest(
+                                Map<String, dynamic>.from(req),
+                                path: path,
                               );
                             },
-                          )
-                        else
-                          ReorderableDragStartListener(
-                            index: index,
-                            child: const Icon(
-                              Icons.drag_indicator,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        if (savedResponses.isNotEmpty) ...[
-                          GestureDetector(
-                            onTap: () => isExpanded.value = !isExpanded.value,
-                            child: Icon(
-                              isExpanded.value
-                                  ? Icons.keyboard_arrow_down
-                                  : Icons.keyboard_arrow_right,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                        if (req['requestKind'] == 'websocket')
-                          const Text(
-                            'WS',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple,
-                            ),
-                          )
-                        else if (req['requestKind'] == 'socketio')
-                          const Text(
-                            'IO',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          )
-                        else
-                          Text(
-                            req['method'] ?? 'GET',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.getMethodColor(req['method']),
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        Text(
-                          req['name'] ?? 'Unnamed Request',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
+                            onCancel: () {
+                              reqBuilder.loadRequest(
+                                Map<String, dynamic>.from(req),
+                                path: path,
+                              );
+                            },
+                          );
+                        } else {
+                          reqBuilder.loadRequest(
+                            Map<String, dynamic>.from(req),
+                            path: path,
+                          );
+                        }
+                      }
+                    },
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        border: Border(
+                          left: BorderSide(
+                            color: isSelected
+                                ? const Color(0xFFFF6C37)
+                                : Colors.transparent,
+                            width: 2,
                           ),
                         ),
-                        if (isSelected && reqBuilder.hasUnsavedChanges.value)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 6),
-                            child: Icon(
-                              Icons.circle,
-                              size: 8,
-                              color: Colors.orange,
+                      ),
+                      padding: EdgeInsets.only(
+                        left: 32.0 + (depth * 16.0),
+                        right: 8.0,
+                      ),
+                      child: Row(
+                        children: [
+                          if (workspaceController.isSelectionMode.value)
+                            Checkbox(
+                              value: workspaceController.selectedRequestIds
+                                  .contains(req['_id']),
+                              onChanged: (val) {
+                                workspaceController.toggleRequestSelection(
+                                  req['_id'],
+                                );
+                              },
+                            )
+                          else
+                            ReorderableDragStartListener(
+                              index: index,
+                              child: const Icon(
+                                Icons.drag_indicator,
+                                size: 14,
+                                color: Color(0xFF555870),
+                              ),
+                            ),
+                          const SizedBox(width: 6),
+                          if (savedResponses.isNotEmpty) ...[
+                            GestureDetector(
+                              onTap: () =>
+                                  isExpanded.value = !isExpanded.value,
+                              child: Icon(
+                                isExpanded.value
+                                    ? Icons.keyboard_arrow_down
+                                    : Icons.keyboard_arrow_right,
+                                size: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                          ],
+                          // Method badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getMethodBadgeColor(
+                                req['requestKind'],
+                                req['method'],
+                              ).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              _getMethodLabel(
+                                req['requestKind'],
+                                req['method'],
+                              ),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: _getMethodBadgeColor(
+                                  req['requestKind'],
+                                  req['method'],
+                                ),
+                                letterSpacing: 0.3,
+                              ),
                             ),
                           ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              req['name'] ?? 'Unnamed Request',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: isSelected
+                                    ? const Color(0xFFE8E8E8)
+                                    : const Color(0xFFAAAAAA),
+                              ),
+                            ),
+                          ),
+                          if (isSelected && reqBuilder.hasUnsavedChanges.value)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 4),
+                              child: Icon(
+                                Icons.circle,
+                                size: 6,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          // More options
+                          Obx(() {
+                            if (workspaceController.duplicatingRequestId.value ==
+                                req['_id']) {
+                              return const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.primary,
+                                ),
+                              );
+                            }
+                            return workspaceController
+                                        .userRoleInWorkspace.value ==
+                                    'viewer'
+                                ? const SizedBox.shrink()
+                                : PopupMenuButton<String>(
+                                    icon: const Icon(
+                                      Icons.more_vert,
+                                      size: 14,
+                                      color: Color(0xFF666980),
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    splashRadius: 14,
+                                    tooltip: 'Options',
+                                    color: const Color(0xFF2A2D3E),
+                                    onSelected: (value) {
+                                      if (value == 'rename') {
+                                        showRenameRequestDialog(
+                                          Get.context!,
+                                          req,
+                                          workspaceController,
+                                        );
+                                      } else if (value == 'duplicate') {
+                                        workspaceController.duplicateRequest(
+                                          Map<String, dynamic>.from(req),
+                                        );
+                                      } else if (value == 'delete') {
+                                        DialogHelper.showConfirmationDialog(
+                                          title: 'Delete Request',
+                                          message: 'Are you sure you want to delete ${req['name']}? This action cannot be undone.',
+                                          confirmText: 'Delete',
+                                          isDestructive: true,
+                                          onConfirm: () {
+                                            workspaceController.deleteRequest(
+                                              req['_id'],
+                                            );
+                                          },
+                                        );
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'rename',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.edit_outlined,
+                                              size: 14,
+                                              color: Colors.white70,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Rename',
+                                              style: TextStyle(fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'duplicate',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.copy_outlined,
+                                              size: 14,
+                                              color: Colors.white70,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Duplicate',
+                                              style: TextStyle(fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete_outline,
+                                              size: 14,
+                                              color: Colors.red,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Delete',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                          }),
+                        ],
+                      ),
                     ),
                   ),
-                  onTap: () {
-                    if (workspaceController.isSelectionMode.value) {
-                      workspaceController.toggleRequestSelection(req['_id']);
-                    } else {
-                      if (reqBuilder.hasUnsavedChanges.value &&
-                          reqBuilder.currentRequestId.value != req['_id']) {
-                        Get.defaultDialog(
-                          title: 'Unsaved Changes',
-                          middleText:
-                              'You have unsaved changes. Save before switching?',
-                          textConfirm: 'Save',
-                          textCancel: 'Discard',
-                          confirmTextColor: Colors.white,
-                          buttonColor: Colors.blue,
-                          onConfirm: () async {
-                            await reqBuilder.saveChanges();
-                            Get.back();
-                            reqBuilder.loadRequest(
-                              Map<String, dynamic>.from(req),
-                              path: path,
-                            );
-                          },
-                          onCancel: () {
-                            reqBuilder.loadRequest(
-                              Map<String, dynamic>.from(req),
-                              path: path,
-                            );
-                          },
-                        );
-                      } else {
-                        reqBuilder.loadRequest(
-                          Map<String, dynamic>.from(req),
-                          path: path,
-                        );
-                      }
-                    }
-                  },
-                  trailing: Obx(() {
-                    if (workspaceController.duplicatingRequestId.value ==
-                        req['_id']) {
-                      return const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppTheme.primary,
-                        ),
-                      );
-                    }
-                    return workspaceController.userRoleInWorkspace.value ==
-                            'viewer'
-                        ? const SizedBox.shrink()
-                        : PopupMenuButton<String>(
-                            icon: const Icon(
-                              Icons.more_vert,
-                              size: 16,
-                              color: AppTheme.textSecondary,
-                            ),
-                            padding: EdgeInsets.zero,
-                            splashRadius: 16,
-                            tooltip: 'Options',
-                            color: const Color(0xFF2A2D3E),
-                            onSelected: (value) {
-                              if (value == 'rename') {
-                                showRenameRequestDialog(
-                                  Get.context!,
-                                  req,
-                                  workspaceController,
-                                );
-                              } else if (value == 'duplicate') {
-                                workspaceController.duplicateRequest(
-                                  Map<String, dynamic>.from(req),
-                                );
-                              } else if (value == 'delete') {
-                                DialogHelper.showConfirmationDialog(
-                                  title: 'Delete Request',
-                                  message: 'Are you sure you want to delete ${req['name']}? This action cannot be undone.',
-                                  confirmText: 'Delete',
-                                  isDestructive: true,
-                                  onConfirm: () {
-                                    workspaceController.deleteRequest(
-                                      req['_id'],
-                                    );
-                                  },
-                                );
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'rename',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.edit_outlined,
-                                      size: 16,
-                                      color: Colors.white70,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Rename',
-                                      style: TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'duplicate',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.copy_outlined,
-                                      size: 16,
-                                      color: Colors.white70,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Duplicate',
-                                      style: TextStyle(fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuDivider(),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.delete_outline,
-                                      size: 16,
-                                      color: Colors.red,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Delete',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                  }),
                 ),
               ),
             ), // Close Dismissible and Obx
@@ -1290,11 +1612,54 @@ class HomeView extends GetView<WorkspaceController> {
     );
   }
 
+  Color _getMethodBadgeColor(String? requestKind, String? method) {
+    if (requestKind == 'websocket') return Colors.purple;
+    if (requestKind == 'socketio') return Colors.orange;
+    return AppTheme.getMethodColor(method);
+  }
+
+  String _getMethodLabel(String? requestKind, String? method) {
+    if (requestKind == 'websocket') return 'WS';
+    if (requestKind == 'socketio') return 'IO';
+    return method ?? 'GET';
+  }
+
   Color _getStatusColor(int? status) {
     if (status == null) return AppTheme.textSecondary;
     if (status >= 200 && status < 300) return AppTheme.getMethod;
     if (status >= 400 && status < 500) return AppTheme.postMethod;
     if (status >= 500) return AppTheme.deleteMethod;
     return AppTheme.putMethod;
+  }
+}
+
+class _CollectionHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Widget Function(BuildContext context, bool isPinned) builder;
+
+  _CollectionHeaderDelegate({
+    required this.height,
+    required this.builder,
+  });
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final isPinned = shrinkOffset > 0 || overlapsContent;
+    return builder(context, isPinned);
+  }
+
+  @override
+  bool shouldRebuild(covariant _CollectionHeaderDelegate oldDelegate) {
+    return true;
   }
 }

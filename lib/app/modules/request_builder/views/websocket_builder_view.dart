@@ -1,30 +1,104 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
+import '../widgets/syntax_highlighting_controller.dart';
+import '../widgets/beautify_button.dart';
+import '../widgets/code_formatter.dart';
+import '../widgets/comment_toggle_helper.dart';
 
 class WebSocketBuilderView extends StatefulWidget {
-  const WebSocketBuilderView({Key? key}) : super(key: key);
+  const WebSocketBuilderView({super.key});
 
   @override
-  _WebSocketBuilderViewState createState() => _WebSocketBuilderViewState();
+  State<WebSocketBuilderView> createState() => _WebSocketBuilderViewState();
 }
 
 class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
-  final SocketController socketController = Get.put(SocketController());
-  final RequestBuilderController reqController = Get.find<RequestBuilderController>();
-  final TextEditingController messageController = TextEditingController();
+  late final SocketController socketController;
+  final RequestBuilderController reqController =
+      Get.find<RequestBuilderController>();
+  late final SyntaxHighlightingController messageController =
+      SyntaxHighlightingController(format: 'json');
   final RxDouble topHeight = 400.0.obs;
+  bool _isBeautified = false;
+  Timer? _beautifyTimer;
+
+  String _extractRaw(dynamic bodyVal) {
+    if (bodyVal == null) return '';
+    if (bodyVal is Map && bodyVal['raw'] != null) {
+      return _extractRaw(bodyVal['raw']);
+    }
+    return bodyVal.toString();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final reqId = reqController.currentRequestId.value;
+    final requestTag =
+        reqId != null && reqId.isNotEmpty ? reqId : 'new_websocket_request';
+    if (Get.isRegistered<SocketController>(tag: requestTag)) {
+      socketController = Get.find<SocketController>(tag: requestTag);
+    } else {
+      socketController = Get.put(SocketController(), tag: requestTag);
+    }
+
+    // Load saved payload
+    final rawText = _extractRaw(reqController.body.value);
+    if (rawText.isNotEmpty) {
+      messageController.text = rawText;
+    }
+
+    // Sync message changes to request body for persistence and auto-save
+    messageController.addListener(_onMessageChanged);
+  }
+
+  void _onMessageChanged() {
+    reqController.body.value = messageController.text;
+  }
 
   @override
   void dispose() {
-    socketController.disconnect();
-    Get.delete<SocketController>();
+    _beautifyTimer?.cancel();
+    messageController.removeListener(_onMessageChanged);
+    messageController.dispose();
     super.dispose();
+  }
+
+  void _beautify() {
+    final raw = messageController.text;
+    if (raw.trim().isEmpty) return;
+    try {
+      final formatted = CodeFormatter.format(text: raw, format: 'json');
+      if (formatted != null && formatted != raw) {
+        _beautifyTimer?.cancel();
+        setState(() {
+          messageController.text = formatted;
+          _isBeautified = true;
+        });
+        reqController.body.value = formatted;
+        reqController.hasUnsavedChanges.value = true;
+        _beautifyTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _isBeautified = false);
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _toggleComment() {
+    final updated = CommentToggleHelper.toggle(messageController.value);
+    if (updated != null) {
+      setState(() => messageController.value = updated);
+      reqController.body.value = updated.text;
+      reqController.hasUnsavedChanges.value = true;
+    }
   }
 
   Widget _buildMessageContent(String data) {
@@ -116,22 +190,39 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
             children: [
               Expanded(
                 child: Container(
-                  height: 40,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    border: Border.all(color: Colors.grey[800]!),
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFF1E2030),
+                    border: Border.all(color: const Color(0xFF2D3142)),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text(
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF9D4EDD).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
                           'WS',
-                          style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Color(0xFFB57EDC),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                      VerticalDivider(color: Colors.grey[800], width: 1, indent: 6, endIndent: 6),
+                      VerticalDivider(
+                        color: Colors.grey[800],
+                        width: 16,
+                        indent: 8,
+                        endIndent: 8,
+                      ),
                       Expanded(
                         child: TextField(
                           controller: reqController.urlController,
@@ -140,9 +231,15 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                             hoverColor: Colors.transparent,
                             filled: false,
                             hintText: 'ws:// or wss://',
-                            hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
+                            hintStyle: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 13,
+                            ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 12,
+                            ),
                             isDense: true,
                           ),
                         ),
@@ -153,27 +250,43 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
               ),
               const SizedBox(width: 8),
               SizedBox(
-                height: 40,
-                child: Obx(() => ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: socketController.isConnected.value ? Colors.red : const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                height: 44,
+                child: Obx(
+                  () => ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: socketController.isConnected.value
+                          ? const Color(0xFFE53935)
+                          : const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                    ),
+                    onPressed: _connect,
+                    child: socketController.isConnecting.value
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            socketController.isConnected.value
+                                ? 'Disconnect'
+                                : 'Connect',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                   ),
-                  onPressed: _connect,
-                  child: socketController.isConnecting.value
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(
-                          socketController.isConnected.value ? 'Disconnect' : 'Connect',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                )),
+                ),
               ),
             ],
           ),
         ),
-        
+
         // Error Message if any
         Obx(() {
           if (socketController.connectionError.value.isNotEmpty) {
@@ -191,13 +304,18 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
         // Main Layout (Messages History and Composer)
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return Obx(() {
                   double h = topHeight.value;
                   if (h < 150) h = 150;
-                  if (h > constraints.maxHeight - 150) h = constraints.maxHeight - 150;
+                  if (h > constraints.maxHeight - 150) {
+                    h = constraints.maxHeight - 150;
+                  }
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -215,11 +333,14 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                                 isScrollable: true,
                                 tabAlignment: TabAlignment.start,
                                 dividerColor: Colors.transparent,
-                                indicatorColor: Colors.orange,
+                                indicatorColor: Color(0xFFFF6C37),
                                 indicatorWeight: 2,
-                                labelColor: Colors.white,
+                                labelColor: Color(0xFFFF6C37),
                                 unselectedLabelColor: Colors.grey,
-                                labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                labelStyle: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
                                 tabs: [
                                   Tab(text: 'Docs'),
                                   Tab(text: 'Params'),
@@ -232,21 +353,27 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                               Expanded(
                                 child: TabBarView(
                                   children: [
-                                     DocsView(),
+                                    DocsView(),
                                     DynamicTableView(
                                       items: reqController.queryParams,
                                       title: 'Query Params',
-                                      onChanged: () => reqController.hasUnsavedChanges.value = true,
+                                      onChanged: () => reqController
+                                          .hasUnsavedChanges
+                                          .value = true,
                                     ),
                                     DynamicTableView(
                                       items: reqController.headers,
                                       title: 'Headers',
-                                      onChanged: () => reqController.hasUnsavedChanges.value = true,
+                                      onChanged: () => reqController
+                                          .hasUnsavedChanges
+                                          .value = true,
                                     ),
                                     // Message Composer
                                     Container(
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.grey[800]!),
+                                        border: Border.all(
+                                          color: const Color(0xFF2D3142),
+                                        ),
                                         borderRadius: const BorderRadius.only(
                                           bottomLeft: Radius.circular(8),
                                           bottomRight: Radius.circular(8),
@@ -255,57 +382,165 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                                       child: Column(
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            color: Colors.grey[900],
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF181A25),
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: Radius.circular(8),
+                                                topRight: Radius.circular(8),
+                                              ),
+                                            ),
                                             child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
                                               children: [
-                                                const Text('Payload', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                                const Text(
+                                                  'Payload',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFFA0A5B5),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                                BeautifyButton(
+                                                  onPressed: _beautify,
+                                                  isBeautified: _isBeautified,
+                                                ),
                                               ],
                                             ),
                                           ),
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.all(8.0),
+                                              padding: const EdgeInsets.all(
+                                                8.0,
+                                              ),
                                               child: Column(
                                                 children: [
                                                   Expanded(
-                                                    child: TextField(
-                                                      controller: messageController,
-                                                      maxLines: null,
-                                                      expands: true,
-                                                      textAlignVertical: TextAlignVertical.top,
-                                                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                                                      decoration: const InputDecoration(
-                                                        hoverColor: Colors.transparent,
-                                                        filled: false,
-                                                        hintText: 'Enter message to send...',
-                                                        border: InputBorder.none,
-                                                        isDense: true,
+                                                    child: CallbackShortcuts(
+                                                      bindings: {
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .slash,
+                                                          control: true,
+                                                        ): _toggleComment,
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .slash,
+                                                          meta: true,
+                                                        ): _toggleComment,
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .keyB,
+                                                          control: true,
+                                                          shift: true,
+                                                        ): _beautify,
+                                                        const SingleActivator(
+                                                          LogicalKeyboardKey
+                                                              .keyB,
+                                                          meta: true,
+                                                          shift: true,
+                                                        ): _beautify,
+                                                      },
+                                                      child: TextField(
+                                                        controller:
+                                                            messageController,
+                                                        onChanged: (val) {
+                                                          if (_isBeautified) {
+                                                            setState(
+                                                              () =>
+                                                                  _isBeautified =
+                                                                      false,
+                                                            );
+                                                          }
+                                                        },
+                                                        maxLines: null,
+                                                        expands: true,
+                                                        textAlignVertical:
+                                                            TextAlignVertical
+                                                                .top,
+                                                        style: const TextStyle(
+                                                          fontFamily:
+                                                              'monospace',
+                                                          fontSize: 13,
+                                                          color: Color(
+                                                            0xFFD4D4D4,
+                                                          ),
+                                                        ),
+                                                        decoration:
+                                                            const InputDecoration(
+                                                              hoverColor: Colors
+                                                                  .transparent,
+                                                              filled: false,
+                                                              hintText:
+                                                                  'Enter message to send...',
+                                                              border: InputBorder
+                                                                  .none,
+                                                              isDense: true,
+                                                            ),
                                                       ),
                                                     ),
                                                   ),
                                                   const SizedBox(height: 8),
                                                   Row(
-                                                    mainAxisAlignment: MainAxisAlignment.end,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.end,
                                                     children: [
-                                                      Obx(() => ElevatedButton(
-                                                        onPressed: socketController.isConnected.value
-                                                            ? () {
-                                                                if (messageController.text.isNotEmpty) {
-                                                                  socketController.sendMessage(messageController.text);
-                                                                  messageController.clear();
+                                                      Obx(
+                                                        () => ElevatedButton(
+                                                          onPressed:
+                                                              socketController
+                                                                  .isConnected
+                                                                  .value
+                                                              ? () {
+                                                                  if (messageController
+                                                                      .text
+                                                                      .isNotEmpty) {
+                                                                    final rawText = messageController.text;
+                                                                    final cleanText = rawText
+                                                                        .split('\n')
+                                                                        .where((line) => !line.trimLeft().startsWith('//'))
+                                                                        .join('\n');
+                                                                    socketController
+                                                                        .sendMessage(
+                                                                          cleanText,
+                                                                        );
+                                                                  }
                                                                 }
-                                                              }
-                                                            : null,
-                                                        style: ElevatedButton.styleFrom(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                                          backgroundColor: const Color(0xFF2563EB),
-                                                          foregroundColor: Colors.white,
-                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                                              : null,
+                                                          style: ElevatedButton
+                                                              .styleFrom(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          24,
+                                                                      vertical:
+                                                                          12,
+                                                                    ),
+                                                                backgroundColor:
+                                                                    const Color(
+                                                                      0xFFFF6C37,
+                                                                    ),
+                                                                foregroundColor:
+                                                                    Colors
+                                                                        .white,
+                                                                elevation: 0,
+                                                                shape: RoundedRectangleBorder(
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        6,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                          child: const Text(
+                                                            'Send',
+                                                          ),
                                                         ),
-                                                        child: const Text('Send'),
-                                                      )),
+                                                      ),
                                                     ],
                                                   ),
                                                 ],
@@ -315,7 +550,12 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                                         ],
                                       ),
                                     ),
-                                    const Center(child: Text('Settings coming soon', style: TextStyle(color: Colors.grey))),
+                                    const Center(
+                                      child: Text(
+                                        'Settings coming soon',
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -328,21 +568,45 @@ class _WebSocketBuilderViewState extends State<WebSocketBuilderView> {
                       MouseRegion(
                         cursor: SystemMouseCursors.resizeUpDown,
                         child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
                           onPanUpdate: (details) {
                             topHeight.value += details.delta.dy;
                           },
                           child: Container(
-                            height: 16,
-                            color: Colors.transparent,
-                            child: Center(
-                              child: Container(
-                                height: 4,
-                                width: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[700],
-                                  borderRadius: BorderRadius.circular(2),
+                            height: 20,
+                            alignment: Alignment.center,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Divider(height: 1, color: Colors.grey[800]),
+                                Container(
+                                  width: 56,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF242736),
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(
+                                      color: const Color(0xFF383B4F),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.drag_handle_rounded,
+                                      size: 15,
+                                      color: Color(0xFF9EA3C0),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ),

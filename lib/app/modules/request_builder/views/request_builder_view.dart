@@ -14,6 +14,7 @@ import '../../../widgets/interactive_tooltip.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:postmanclone/app/widgets/variable_autocomplete.dart';
 import '../widgets/code_snippet_dialog.dart';
+import '../widgets/raw_body_editor.dart';
 
 class RequestBuilderView extends GetView<RequestBuilderController> {
   const RequestBuilderView({Key? key}) : super(key: key);
@@ -22,7 +23,9 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
   Widget build(BuildContext context) {
     return Obx(() {
       if (controller.requestKind.value == 'websocket') {
-        return const WebSocketBuilderView();
+        return WebSocketBuilderView(
+          key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
+        );
       } else if (controller.requestKind.value == 'socketio') {
         return SocketIOBuilderView(
           key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
@@ -68,6 +71,7 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                         height: 36,
                         child: ReorderableListView.builder(
                           scrollDirection: Axis.horizontal,
+                          scrollController: controller.tabsScrollController,
                           buildDefaultDragHandles: false,
                           itemCount: controller.openRequests.length,
                           onReorder: (oldIndex, newIndex) {
@@ -222,6 +226,70 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                 ),
                 Row(
                   children: [
+                    Obx(() {
+                      if (controller.openRequests.length <= 1) {
+                        return const SizedBox.shrink();
+                      }
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF222533),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: 'Scroll tabs left',
+                              child: InkWell(
+                                onTap: controller.scrollTabsLeft,
+                                borderRadius: const BorderRadius.horizontal(
+                                  left: Radius.circular(5),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 13,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 16,
+                              color: Colors.white12,
+                            ),
+                            Tooltip(
+                              message: 'Scroll tabs right',
+                              child: InkWell(
+                                onTap: controller.scrollTabsRight,
+                                borderRadius: const BorderRadius.horizontal(
+                                  right: Radius.circular(5),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 13,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                     OutlinedButton.icon(
                       onPressed: () => controller.saveChanges(),
                       icon: const Icon(Icons.save, size: 16),
@@ -261,11 +329,11 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
               children: [
                 Expanded(
                   child: Container(
-                    height: 40,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      border: Border.all(color: Colors.grey[800]!),
-                      borderRadius: BorderRadius.circular(6),
+                      color: const Color(0xFF1E2030),
+                      border: Border.all(color: const Color(0xFF2E3148)),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
@@ -377,15 +445,17 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                 const SizedBox(width: 8),
                 // Send Button
                 SizedBox(
-                  height: 40,
+                  height: 44,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB), // Postman blue
+                      backgroundColor: const Color(0xFFFF6C37),
                       foregroundColor: Colors.white,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                     ),
                     onPressed: () => controller.sendRequest(),
                     child: Obx(
@@ -439,25 +509,31 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                                 isScrollable: true,
                                 tabAlignment: TabAlignment.start,
                                 dividerColor: Colors.transparent,
-                                indicatorColor: Colors.orange,
+                                indicatorColor: Color(0xFFFF6C37),
+                                indicatorSize: TabBarIndicatorSize.label,
                                 indicatorWeight: 2,
-                                labelColor: Colors.white,
-                                unselectedLabelColor: Colors.grey,
+                                labelColor: Color(0xFFFF6C37),
+                                unselectedLabelColor: Color(0xFF666980),
                                 labelStyle: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.2,
+                                ),
+                                unselectedLabelStyle: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
                                 ),
                                 tabs: [
                                   Tab(text: 'Docs'),
                                   Tab(text: 'Params'),
-                                  Tab(text: 'Authorization'),
+                                  Tab(text: 'Auth'),
                                   Tab(text: 'Headers'),
                                   Tab(text: 'Body'),
                                   Tab(text: 'Scripts'),
                                   Tab(text: 'Settings'),
                                 ],
                               ),
-                              const Divider(height: 1, color: Colors.white10),
+                              const Divider(height: 1, color: Color(0xFF2A2D3E)),
                               Expanded(
                                 child: TabBarView(
                                   children: [
@@ -502,15 +578,39 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                             controller.topPanelHeight.value += details.delta.dy;
                           },
                           child: Container(
-                            height: 8, // Thicker invisible grab area
+                            height: 20,
                             width: double.infinity,
                             color: Colors.transparent,
-                            child: Center(
-                              child: Container(
-                                height: 1,
-                                width: double.infinity,
-                                color: Colors.grey[800], // Visible thin line
-                              ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Full-width divider line
+                                Container(
+                                  height: 1,
+                                  width: double.infinity,
+                                  color: const Color(0xFF2A2D3E),
+                                ),
+                                // Drag handle pill
+                                Container(
+                                  width: 56,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF252840),
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(
+                                      color: const Color(0xFF3A3E5C),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.drag_handle_rounded,
+                                      size: 16,
+                                      color: Color(0xFF7B80A0),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -526,16 +626,17 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        Icons.rocket_launch_outlined,
-                                        color: Colors.grey,
-                                        size: 48,
+                                        Icons.send_rounded,
+                                        color: Color(0xFF2A2D3E),
+                                        size: 40,
                                       ),
-                                      SizedBox(height: 16),
+                                      SizedBox(height: 12),
                                       Text(
-                                        'Send + Get a successful response',
+                                        'Hit Send to get a response',
                                         style: TextStyle(
-                                          color: Colors.grey,
+                                          color: Color(0xFF555870),
                                           fontSize: 13,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -551,10 +652,10 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                                         vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).cardColor,
-                                        border: Border(
+                                        color: const Color(0xFF1A1C27),
+                                        border: const Border(
                                           bottom: BorderSide(
-                                            color: Colors.grey[800]!,
+                                            color: Color(0xFF2A2D3E),
                                           ),
                                         ),
                                       ),
@@ -563,41 +664,70 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
                                           const Text(
                                             'Response',
                                             style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF9E9E9E),
+                                              letterSpacing: 0.3,
                                             ),
                                           ),
-                                          const SizedBox(width: 24),
+                                          const SizedBox(width: 20),
                                           const Text(
                                             'History',
                                             style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey,
+                                              fontSize: 12,
+                                              color: Color(0xFF555870),
                                             ),
                                           ),
                                           const Spacer(),
-                                          Text(
-                                            'Status: ${controller.responseStatus.value} OK',
-                                            style: const TextStyle(
-                                              color: Colors.green,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
+                                          // Status badge
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: controller
+                                                  .statusColor
+                                                  .withOpacity(0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: controller.statusColor
+                                                    .withOpacity(0.3),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              controller
+                                                      .statusMessage
+                                                      .isNotEmpty
+                                                  ? '${controller.responseStatus.value} ${controller.statusMessage}'
+                                                  : (controller.responseStatus
+                                                              .value >
+                                                          0
+                                                      ? '${controller.responseStatus.value}'
+                                                      : 'Error'),
+                                              style: TextStyle(
+                                                color: controller.statusColor,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
                                           ),
-                                          const SizedBox(width: 16),
+                                          const SizedBox(width: 12),
                                           Text(
-                                            'Time: ${controller.responseTime.value} ms',
+                                            '${controller.responseTime.value} ms',
                                             style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
+                                              fontSize: 11,
+                                              color: Color(0xFF666980),
                                             ),
                                           ),
-                                          const SizedBox(width: 16),
+                                          const SizedBox(width: 12),
                                           Text(
-                                            'Size: ${controller.responseSize.value} B',
+                                            _formatSize(
+                                                controller.responseSize.value),
                                             style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
+                                              fontSize: 11,
+                                              color: Color(0xFF666980),
                                             ),
                                           ),
                                           const SizedBox(width: 16),
@@ -721,6 +851,12 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
         style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
       ),
     );
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '${bytes} B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   Color _getMethodColor(String method) {
@@ -1148,29 +1284,53 @@ class _BodyView extends StatelessWidget {
                     const SizedBox(width: 16),
                     DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: controller.bodyFormat.value,
-                        dropdownColor: const Color(0xFF2B2B2B),
+                        value: const [
+                          'text',
+                          'json',
+                          'html',
+                          'xml',
+                          'javascript',
+                        ].contains(controller.bodyFormat.value.toLowerCase())
+                            ? controller.bodyFormat.value.toLowerCase()
+                            : 'json',
+                        dropdownColor: const Color(0xFF242736),
                         style: const TextStyle(
-                          color: Colors.blue,
+                          color: Color(0xFFFF6C37),
                           fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                         icon: const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Colors.blue,
-                          size: 16,
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Color(0xFFFF6C37),
+                          size: 18,
                         ),
                         items: const [
-                          DropdownMenuItem(value: 'text', child: Text('Text')),
-                          DropdownMenuItem(value: 'json', child: Text('JSON')),
-                          DropdownMenuItem(value: 'html', child: Text('HTML')),
-                          DropdownMenuItem(value: 'xml', child: Text('XML')),
+                          DropdownMenuItem(
+                            value: 'text',
+                            child: Text('Text', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ),
+                          DropdownMenuItem(
+                            value: 'json',
+                            child: Text('JSON', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ),
+                          DropdownMenuItem(
+                            value: 'html',
+                            child: Text('HTML', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ),
+                          DropdownMenuItem(
+                            value: 'xml',
+                            child: Text('XML', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ),
                           DropdownMenuItem(
                             value: 'javascript',
-                            child: Text('JavaScript'),
+                            child: Text('JavaScript', style: TextStyle(color: Colors.white, fontSize: 13)),
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null) controller.bodyFormat.value = val;
+                          if (val != null) {
+                            controller.bodyFormat.value = val;
+                            controller.hasUnsavedChanges.value = true;
+                          }
                         },
                       ),
                     ),
@@ -1187,7 +1347,10 @@ class _BodyView extends StatelessWidget {
                 controller.bodyType.value == 'graphql') {
               return Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: _RawBodyEditor(controller: controller),
+                child: RawBodyEditor(
+                  controller: controller,
+                  bodyFormat: controller.bodyFormat.value,
+                ),
               );
             } else if (controller.bodyType.value == 'form-data') {
               return DynamicTableView(
@@ -1693,138 +1856,6 @@ class DynamicTableView extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RawBodyEditor extends StatefulWidget {
-  final RequestBuilderController controller;
-  const _RawBodyEditor({Key? key, required this.controller}) : super(key: key);
-
-  @override
-  State<_RawBodyEditor> createState() => _RawBodyEditorState();
-}
-
-class _RawBodyEditorState extends State<_RawBodyEditor> {
-  late TextEditingController _textController;
-
-  @override
-  void initState() {
-    super.initState();
-    _textController = TextEditingController(
-      text: widget.controller.body.value is String
-          ? widget.controller.body.value
-          : '',
-    );
-  }
-
-  @override
-  void didUpdateWidget(_RawBodyEditor oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final currentVal = widget.controller.body.value is String
-        ? widget.controller.body.value
-        : '';
-    if (currentVal != _textController.text) {
-      _textController.text = currentVal;
-    }
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
-  }
-
-  void _toggleComment() {
-    final text = _textController.text;
-    final selection = _textController.selection;
-
-    if (selection.baseOffset == -1 || selection.extentOffset == -1) return;
-
-    final start = selection.start;
-    final end = selection.end;
-
-    int lineStart = start;
-    while (lineStart > 0 && text[lineStart - 1] != '\n') {
-      lineStart--;
-    }
-
-    int lineEnd = end;
-    while (lineEnd < text.length && text[lineEnd] != '\n') {
-      lineEnd++;
-    }
-
-    final selectedLinesText = text.substring(lineStart, lineEnd);
-    final lines = selectedLinesText.split('\n');
-
-    bool allCommented =
-        lines.isNotEmpty &&
-        lines.every((line) => line.trimLeft().startsWith('//'));
-
-    final newLines = lines.map((line) {
-      if (allCommented) {
-        final idx = line.indexOf('//');
-        if (idx != -1) {
-          final afterComment = line.substring(idx + 2);
-          return line.substring(0, idx) +
-              (afterComment.startsWith(' ')
-                  ? afterComment.substring(1)
-                  : afterComment);
-        }
-        return line;
-      } else {
-        return '// $line';
-      }
-    }).toList();
-
-    final newLinesText = newLines.join('\n');
-    final newText = text.replaceRange(lineStart, lineEnd, newLinesText);
-    final lengthDiff = newLinesText.length - selectedLinesText.length;
-
-    setState(() {
-      _textController.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection(
-          baseOffset:
-              start +
-              (start == lineStart && allCommented
-                  ? -3
-                  : (start == lineStart && !allCommented ? 3 : 0)),
-          extentOffset: end + lengthDiff,
-        ),
-      );
-    });
-
-    widget.controller.body.value = newText;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.slash, control: true):
-            _toggleComment,
-        const SingleActivator(LogicalKeyboardKey.slash, meta: true):
-            _toggleComment,
-      },
-      child: Focus(
-        autofocus: true,
-        child: TextFormField(
-          key: ValueKey(
-            '${widget.controller.currentRequestId.value}_body_field',
-          ),
-          controller: _textController,
-          onChanged: (val) => widget.controller.body.value = val,
-          maxLines: null,
-          expands: true,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontFamily: 'monospace',
-          ),
-          decoration: const InputDecoration(border: InputBorder.none),
-        ),
-      ),
     );
   }
 }

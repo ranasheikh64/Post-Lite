@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart' hide FormData, MultipartFile;
 import 'package:postmanclone/app/data/providers/api_service.dart';
@@ -120,6 +121,79 @@ class RequestBuilderController extends GetxController {
   var responseSize = 0.obs;
   var responseData = ''.obs;
   var isCopied = false.obs;
+
+  String get statusMessage {
+    final code = responseStatus.value;
+    if (code >= 200 && code < 300) {
+      if (code == 201) return 'Created';
+      if (code == 202) return 'Accepted';
+      if (code == 204) return 'No Content';
+      return 'OK';
+    }
+    if (code == 301) return 'Moved Permanently';
+    if (code == 302) return 'Found';
+    if (code == 304) return 'Not Modified';
+    if (code == 400) return 'Bad Request';
+    if (code == 401) return 'Unauthorized';
+    if (code == 403) return 'Forbidden';
+    if (code == 404) return 'Not Found';
+    if (code == 405) return 'Method Not Allowed';
+    if (code == 409) return 'Conflict';
+    if (code == 422) return 'Unprocessable Entity';
+    if (code == 429) return 'Too Many Requests';
+    if (code == 500) return 'Internal Server Error';
+    if (code == 502) return 'Bad Gateway';
+    if (code == 503) return 'Service Unavailable';
+    if (code == 504) return 'Gateway Timeout';
+    if (code == 0) return '';
+    return '';
+  }
+
+  Color get statusColor {
+    final code = responseStatus.value;
+    if (code >= 200 && code < 300) return const Color(0xFF10B981);
+    if (code >= 300 && code < 400) return const Color(0xFF3B82F6);
+    if (code >= 400 && code < 500) return const Color(0xFFF59E0B);
+    return const Color(0xFFEF4444);
+  }
+
+  // -- Tabs Scroll Controller & Navigation --
+  final ScrollController tabsScrollController = ScrollController();
+
+  void scrollTabsLeft() {
+    if (tabsScrollController.hasClients) {
+      final target = (tabsScrollController.offset - 240).clamp(
+        0.0,
+        tabsScrollController.position.maxScrollExtent,
+      );
+      tabsScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void scrollTabsRight() {
+    if (tabsScrollController.hasClients) {
+      final target = (tabsScrollController.offset + 240).clamp(
+        0.0,
+        tabsScrollController.position.maxScrollExtent,
+      );
+      tabsScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
+  void onClose() {
+    _autoSaveTimer?.cancel();
+    tabsScrollController.dispose();
+    super.onClose();
+  }
 
   var topPanelHeight = 300.0.obs;
   bool _isParsingUrl = false;
@@ -368,6 +442,15 @@ class RequestBuilderController extends GetxController {
     bool exists = openRequests.any((req) => req['_id'] == request['_id']);
     if (!exists) {
       openRequests.add(Map<String, dynamic>.from(request));
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (tabsScrollController.hasClients) {
+          tabsScrollController.animateTo(
+            tabsScrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
     }
 
     _finishLoadRequest(request);
@@ -444,7 +527,8 @@ class RequestBuilderController extends GetxController {
       request['queryParams'] ?? [],
     );
     originalBodyType = request['bodyType'] ?? 'none';
-    originalBodyFormat = request['bodyFormat'] ?? 'json';
+    originalBodyFormat =
+        (request['bodyFormat'] ?? 'json').toString().toLowerCase();
     originalBody = request['body'] ?? '';
     originalSocketConfig = request['socketConfig'] ?? <String, dynamic>{};
 
@@ -687,6 +771,7 @@ class RequestBuilderController extends GetxController {
 
     final dio = Dio();
     final stopwatch = Stopwatch()..start();
+    String resolvedUrl = '';
 
     try {
       final workspaceController = Get.find<WorkspaceController>();
@@ -744,7 +829,7 @@ class RequestBuilderController extends GetxController {
         return result.toString();
       }
 
-      final resolvedUrl = resolveVariables(url.value);
+      resolvedUrl = resolveVariables(url.value).trim();
 
       // Build Headers Map
       final requestHeaders = <String, dynamic>{};
@@ -775,12 +860,16 @@ class RequestBuilderController extends GetxController {
       // Build Request Body
       dynamic requestBody;
       if (bodyType.value == 'raw') {
-        String rawText = body.value;
-        if (bodyFormat.value == 'json') {
-          rawText = stripJsonComments(rawText);
+        final rawText = body.value;
+        final currentFormat = bodyFormat.value.toLowerCase();
+
+        if (rawText.trim().isEmpty) {
+          requestBody = null;
+        } else if (currentFormat == 'json') {
+          final cleanJson = stripJsonComments(rawText);
           try {
             // Verify that it is valid JSON before sending to prevent 500 API errors
-            requestBody = jsonDecode(resolveVariables(rawText));
+            requestBody = jsonDecode(resolveVariables(cleanJson));
           } catch (e) {
             isLoading.value = false;
             CustomSnackbar.show(
@@ -792,16 +881,32 @@ class RequestBuilderController extends GetxController {
             return;
           }
         } else {
+          // text, html, xml, javascript - sent as resolved string body
           requestBody = resolveVariables(rawText);
         }
 
-        if (!requestHeaders.containsKey('Content-Type')) {
-          if (bodyFormat.value == 'json')
-            requestHeaders['Content-Type'] = 'application/json';
-          else if (bodyFormat.value == 'xml')
-            requestHeaders['Content-Type'] = 'application/xml';
-          else
-            requestHeaders['Content-Type'] = 'text/plain';
+        final hasContentType = requestHeaders.keys.any(
+          (k) => k.toLowerCase() == 'content-type',
+        );
+        if (!hasContentType) {
+          switch (currentFormat) {
+            case 'json':
+              requestHeaders['Content-Type'] = 'application/json';
+              break;
+            case 'xml':
+              requestHeaders['Content-Type'] = 'application/xml';
+              break;
+            case 'html':
+              requestHeaders['Content-Type'] = 'text/html';
+              break;
+            case 'javascript':
+              requestHeaders['Content-Type'] = 'application/javascript';
+              break;
+            case 'text':
+            default:
+              requestHeaders['Content-Type'] = 'text/plain';
+              break;
+          }
         }
       } else if (bodyType.value == 'form-data') {
         final fd = FormData();
@@ -839,42 +944,140 @@ class RequestBuilderController extends GetxController {
           }
         }
         requestBody = map;
-        requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        final hasContentType = requestHeaders.keys.any(
+          (k) => k.toLowerCase() == 'content-type',
+        );
+        if (!hasContentType) {
+          requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        }
+      } else if (bodyType.value == 'graphql') {
+        final rawText = body.value;
+        if (rawText.trim().isNotEmpty) {
+          try {
+            final parsed = jsonDecode(rawText);
+            if (parsed is Map && parsed.containsKey('query')) {
+              requestBody = parsed;
+            } else {
+              requestBody = {'query': resolveVariables(rawText)};
+            }
+          } catch (_) {
+            requestBody = {'query': resolveVariables(rawText)};
+          }
+        } else {
+          requestBody = {'query': ''};
+        }
+        final hasContentType = requestHeaders.keys.any(
+          (k) => k.toLowerCase() == 'content-type',
+        );
+        if (!hasContentType) {
+          requestHeaders['Content-Type'] = 'application/json';
+        }
+      } else if (bodyType.value == 'binary') {
+        final rawText = body.value;
+        if (rawText.trim().isNotEmpty) {
+          requestBody = resolveVariables(rawText);
+        }
+        final hasContentType = requestHeaders.keys.any(
+          (k) => k.toLowerCase() == 'content-type',
+        );
+        if (!hasContentType) {
+          requestHeaders['Content-Type'] = 'application/octet-stream';
+        }
       }
 
-      // Route all requests through the proxy to avoid CORS in Web
-      final proxyUrl = '${NetworkCaller().baseUrl}/proxy';
-      final isFormData = requestBody is FormData;
+      bool isLocalhost(String urlStr) {
+        try {
+          final uri = Uri.parse(urlStr);
+          final host = uri.host.toLowerCase();
+          return host == 'localhost' ||
+              host == '127.0.0.1' ||
+              host == '0.0.0.0' ||
+              host == '::1' ||
+              host.endsWith('.localhost');
+        } catch (_) {
+          return urlStr.contains('localhost') || urlStr.contains('127.0.0.1');
+        }
+      }
 
-      dynamic proxyData;
-
-      if (isFormData) {
-        final fd = requestBody;
-        fd.fields.add(MapEntry('Proxy-Method', method.value));
-        fd.fields.add(MapEntry('Proxy-Url', resolvedUrl));
-        fd.fields.add(MapEntry('Proxy-Headers', jsonEncode(requestHeaders)));
-        proxyData = fd;
-      } else {
-        proxyData = {
-          'method': method.value,
-          'url': resolvedUrl,
-          'headers': requestHeaders,
-          'body': requestBody,
+      // Check if running on Web and attempting to access localhost via remote cloud proxy
+      if (kIsWeb && isLocalhost(resolvedUrl)) {
+        stopwatch.stop();
+        responseTime.value = stopwatch.elapsedMilliseconds;
+        responseStatus.value = 0;
+        final errorPayload = {
+          "error": "Localhost Not Accessible via Web Browser",
+          "message":
+              "You are running Post-Lite in a Web Browser. Remote cloud proxies (Vercel) cannot connect to 'localhost' or '127.0.0.1' on your local computer.",
+          "how_to_test_localhost": [
+            "🖥️ Desktop App (Recommended): Run the Post-Lite Desktop App (macOS, Windows, Linux) to test localhost directly with 0 setup and no CORS.",
+            "🌐 Ngrok Tunnel: Expose your local port via 'npx ngrok http <port>' (e.g. npx ngrok http 5000) and test the public https ngrok URL.",
+            "💻 Local Backend: Run the Post-Lite backend server locally on your machine and set baseUrl to 'http://localhost:4000'."
+          ]
         };
+        final prettyNotice =
+            const JsonEncoder.withIndent('  ').convert(errorPayload);
+        responseData.value = prettyNotice;
+        responseSize.value = prettyNotice.length;
+
+        CustomSnackbar.show(
+          title: 'Localhost not supported on Web',
+          message:
+              'Cloud proxy cannot reach your local machine. Please run the Desktop app or use ngrok.',
+          isError: true,
+        );
+        return;
       }
 
       dio.options.connectTimeout = const Duration(seconds: 30);
       dio.options.receiveTimeout = const Duration(seconds: 30);
 
-      final proxyResponse = await dio.post(proxyUrl, data: proxyData);
+      dynamic actualData;
+      int statusCode = 200;
+
+      if (kIsWeb) {
+        // Route through proxy on Web to bypass browser CORS limitations
+        final proxyUrl = '${NetworkCaller().baseUrl}/proxy';
+        final isFormData = requestBody is FormData;
+        dynamic proxyData;
+
+        if (isFormData) {
+          final fd = requestBody;
+          fd.fields.add(MapEntry('Proxy-Method', method.value));
+          fd.fields.add(MapEntry('Proxy-Url', resolvedUrl));
+          fd.fields.add(MapEntry('Proxy-Headers', jsonEncode(requestHeaders)));
+          proxyData = fd;
+        } else {
+          proxyData = {
+            'method': method.value,
+            'url': resolvedUrl,
+            'headers': requestHeaders,
+            'body': requestBody,
+          };
+        }
+
+        final proxyResponse = await dio.post(proxyUrl, data: proxyData);
+        statusCode = proxyResponse.data['status'] ?? 200;
+        actualData = proxyResponse.data['data'];
+      } else {
+        // Direct request on Desktop (macOS, Windows, Linux) and Mobile
+        // No CORS restrictions, direct localhost and local network access
+        final response = await dio.request(
+          resolvedUrl,
+          data: requestBody,
+          options: Options(
+            method: method.value,
+            headers: requestHeaders,
+            validateStatus: (status) => true, // Accept 2xx, 3xx, 4xx, 5xx as valid responses
+          ),
+        );
+        statusCode = response.statusCode ?? 200;
+        actualData = response.data;
+      }
 
       stopwatch.stop();
       responseTime.value = stopwatch.elapsedMilliseconds;
+      responseStatus.value = statusCode;
 
-      // The proxy returns 200 always, with the real status inside proxyResponse.data['status']
-      responseStatus.value = proxyResponse.data['status'] ?? 200;
-
-      final actualData = proxyResponse.data['data'];
       final dataString = actualData != null
           ? (actualData is String ? actualData : jsonEncode(actualData))
           : '';
@@ -897,13 +1100,14 @@ class RequestBuilderController extends GetxController {
       responseStatus.value = e.response?.statusCode ?? 0;
 
       if (e.response?.data != null) {
-        final errString = e.response!.data.toString();
+        final errData = e.response!.data;
+        final errString = errData is String ? errData : jsonEncode(errData);
         responseSize.value = errString.length;
         try {
-          if (e.response!.data is Map || e.response!.data is List) {
+          if (errData is Map || errData is List) {
             responseData.value = const JsonEncoder.withIndent(
               '  ',
-            ).convert(e.response!.data);
+            ).convert(errData);
           } else {
             responseData.value = errString;
           }
@@ -911,8 +1115,27 @@ class RequestBuilderController extends GetxController {
           responseData.value = errString;
         }
       } else {
-        responseSize.value = 0;
-        responseData.value = e.message ?? 'Unknown Error';
+        final isLocal = resolvedUrl.contains('localhost') ||
+            resolvedUrl.contains('127.0.0.1');
+        final errorPayload = {
+          "error": "Could not connect to server",
+          "url": resolvedUrl,
+          "details": e.message ?? "Connection refused or unreachable",
+          "hint": isLocal
+              ? "Make sure your local server is actively running on port ${Uri.tryParse(resolvedUrl)?.port ?? ''}."
+              : "Check your internet connection and verify that the target URL is valid and reachable."
+        };
+        final prettyErr =
+            const JsonEncoder.withIndent('  ').convert(errorPayload);
+        responseSize.value = prettyErr.length;
+        responseData.value = prettyErr;
+        CustomSnackbar.show(
+          title: 'Connection Failed',
+          message: isLocal
+              ? 'Could not connect to $resolvedUrl. Make sure your local server is running.'
+              : (e.message ?? 'Failed to connect to server'),
+          isError: true,
+        );
       }
     } catch (e) {
       stopwatch.stop();
