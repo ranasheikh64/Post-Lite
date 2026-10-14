@@ -581,8 +581,14 @@
             <p class="os-meta">Universal Binary (Apple Silicon & Intel)</p>
             <div class="os-action">
               <a href="https://github.com/ranasheikh64/Post-Lite/releases/latest/download/Jronix-Post-macOS.dmg" class="btn btn-primary btn-block">Download .dmg</a>
-              <span class="os-subtext">macOS 11.0 or later</span>
-              <span class="os-subtext" style="color: #94a3b8; font-size: 0.68rem; margin-top: 4px;">💡 First run: System Settings &gt; Privacy &amp; Security &gt; Open Anyway</span>
+              <span class="os-subtext">macOS 11.0 or later (Universal)</span>
+              <div class="mac-bypass-box">
+                <span class="bypass-title">💡 If blocked by Gatekeeper, run:</span>
+                <div class="bypass-code-row">
+                  <code>xattr -cr "/Applications/Jronix Post.app"</code>
+                  <button class="mini-copy-btn" id="copyMacBypassBtn" title="Copy command">Copy</button>
+                </div>
+              </div>
             </div>
           </div>
 

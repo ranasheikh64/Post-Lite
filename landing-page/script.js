@@ -80,6 +80,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // 3b. Copy macOS Bypass Command
+  const copyMacBtn = document.getElementById('copyMacBypassBtn');
+  if (copyMacBtn) {
+    copyMacBtn.addEventListener('click', () => {
+      const macCmd = 'xattr -cr "/Applications/Jronix Post.app"';
+      navigator.clipboard.writeText(macCmd).then(() => {
+        const orig = copyMacBtn.textContent;
+        copyMacBtn.textContent = 'Copied! ✓';
+        copyMacBtn.style.background = '#10b981';
+        copyMacBtn.style.color = '#ffffff';
+
+        setTimeout(() => {
+          copyMacBtn.textContent = orig;
+          copyMacBtn.style.background = '';
+          copyMacBtn.style.color = '';
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+      });
+    });
+  }
+
   // 4. Mobile Menu Toggle
   const mobileToggle = document.getElementById('mobileToggle');
   const navbar = document.getElementById('navbar');
