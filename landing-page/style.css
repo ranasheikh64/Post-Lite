@@ -1268,6 +1268,8 @@ body {
   font-weight: 600;
   color: #94a3b8;
   margin-bottom: 0.35rem;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .bypass-code-row {
@@ -1287,6 +1289,8 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  user-select: all;
+  -webkit-user-select: all;
 }
 
 .mini-copy-btn {
@@ -1300,6 +1304,8 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .mini-copy-btn:hover {
