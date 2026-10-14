@@ -11,7 +11,7 @@ You can deploy this landing page to GitHub Pages in two simple ways:
 ### Option 1: Deploy from a `gh-pages` Branch (Recommended)
 1. In your terminal, run:
    ```bash
-   git subtree push --prefix landing-page origin gh-pages
+   git push origin $(git subtree split --prefix landing-page main):gh-pages --force
    ```
 2. Go to your GitHub repository:
    - **Settings** → **Pages**
