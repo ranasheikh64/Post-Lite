@@ -632,9 +632,11 @@ class WorkspaceController extends GetxController {
     }
   }
 
-  Future<void> fetchCollections() async {
+  Future<void> fetchCollections({bool showLoading = true}) async {
     try {
-      isLoading.value = true;
+      if (showLoading && collections.isEmpty) {
+        isLoading.value = true;
+      }
       final data = await _apiService.getCollections(
         workspaceId: selectedWorkspaceId.value,
       );
@@ -687,11 +689,23 @@ class WorkspaceController extends GetxController {
 
   Future<void> createCollection(String name) async {
     try {
-      await _apiService.createCollection(
+      final responseData = await _apiService.createCollection(
         name,
         workspaceId: selectedWorkspaceId.value,
       );
-      await fetchCollections(); // Refresh list
+      final Map<String, dynamic> newCol =
+          (responseData['data'] is Map<String, dynamic>)
+              ? responseData['data'] as Map<String, dynamic>
+              : responseData;
+
+      if (!newCol.containsKey('requests')) newCol['requests'] = [];
+      if (!newCol.containsKey('folders')) newCol['folders'] = [];
+
+      collections.add(newCol);
+      if (newCol.containsKey('_id')) {
+        expandedCollectionIds.add(newCol['_id']);
+      }
+      collections.refresh();
     } catch (e, stack) {
       log(
         'Failed to create collection',
@@ -709,8 +723,41 @@ class WorkspaceController extends GetxController {
 
   Future<void> createFolder(String parentId, String name) async {
     try {
-      await _apiService.createFolder(parentId, name);
-      await fetchCollections(); // Refresh list
+      final responseData = await _apiService.createFolder(parentId, name);
+      final Map<String, dynamic> newFolder =
+          (responseData['data'] is Map<String, dynamic>)
+              ? responseData['data'] as Map<String, dynamic>
+              : responseData;
+
+      if (!newFolder.containsKey('requests')) newFolder['requests'] = [];
+      if (!newFolder.containsKey('folders')) newFolder['folders'] = [];
+
+      Map<String, dynamic>? targetNode;
+      bool findTarget(List<dynamic> currentLevel) {
+        for (final node in currentLevel) {
+          if (node['_id'] == parentId) {
+            targetNode = node as Map<String, dynamic>;
+            return true;
+          }
+          if (node['folders'] != null && (node['folders'] as List).isNotEmpty) {
+            if (findTarget(node['folders'])) return true;
+          }
+        }
+        return false;
+      }
+
+      findTarget(collections);
+
+      if (targetNode != null) {
+        final currentFolders =
+            List<dynamic>.from(targetNode!['folders'] ?? []);
+        currentFolders.add(newFolder);
+        targetNode!['folders'] = currentFolders;
+        expandedCollectionIds.add(parentId);
+        collections.refresh();
+      } else {
+        await fetchCollections(showLoading: false);
+      }
     } catch (e, stack) {
       log(
         'Failed to create folder',
@@ -931,13 +978,53 @@ class WorkspaceController extends GetxController {
     String requestKind,
   ) async {
     try {
-      await _apiService.createRequest(
+      final responseData = await _apiService.createRequest(
         collectionId,
         name,
         method: method,
         requestKind: requestKind,
       );
-      await fetchCollections(); // Refresh list to show new nested request
+
+      final Map<String, dynamic> newReq =
+          (responseData['data'] is Map<String, dynamic>)
+              ? responseData['data'] as Map<String, dynamic>
+              : responseData;
+
+      // Find the target collection or folder node in collections
+      Map<String, dynamic>? targetNode;
+      bool findTarget(List<dynamic> currentLevel) {
+        for (final node in currentLevel) {
+          if (node['_id'] == collectionId) {
+            targetNode = node as Map<String, dynamic>;
+            return true;
+          }
+          if (node['folders'] != null && (node['folders'] as List).isNotEmpty) {
+            if (findTarget(node['folders'])) return true;
+          }
+        }
+        return false;
+      }
+
+      findTarget(collections);
+
+      if (targetNode != null) {
+        final currentRequests =
+            List<dynamic>.from(targetNode!['requests'] ?? []);
+        currentRequests.add(newReq);
+        targetNode!['requests'] = currentRequests;
+
+        expandedCollectionIds.add(collectionId);
+        collections.refresh();
+      } else {
+        await fetchCollections(showLoading: false);
+      }
+
+      // Automatically open the newly created request
+      try {
+        final reqBuilder = Get.find<RequestBuilderController>();
+        final path = targetNode?['name']?.toString() ?? '';
+        reqBuilder.loadRequest(newReq, path: path);
+      } catch (_) {}
     } catch (e, stack) {
       log(
         'Failed to create request',

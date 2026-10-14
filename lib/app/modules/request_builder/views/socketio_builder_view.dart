@@ -8,8 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postmanclone/app/modules/home/controllers/workspace_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
-import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
+import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView
 import 'package:postmanclone/app/modules/request_builder/widgets/events_table_view.dart'; // For EventsTableView
+import '../widgets/dynamic_table_view.dart';
 import '../widgets/syntax_highlighting_controller.dart';
 import '../widgets/beautify_button.dart';
 import '../widgets/code_formatter.dart';

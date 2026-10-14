@@ -7,7 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:flutter_json_view/flutter_json_view.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/modules/request_builder/controllers/socket_controller.dart';
-import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView and DynamicTableView
+import 'package:postmanclone/app/modules/request_builder/views/request_builder_view.dart'; // For DocsView
+import '../widgets/dynamic_table_view.dart';
 import '../widgets/syntax_highlighting_controller.dart';
 import '../widgets/beautify_button.dart';
 import '../widgets/code_formatter.dart';
