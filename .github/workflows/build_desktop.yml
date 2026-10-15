@@ -18,7 +18,7 @@ jobs:
   # ==========================================
   # 1. Build macOS (.dmg & .zip)
   # ==========================================
-  build-macos:
+  build_macos:
     name: Build macOS
     runs-on: macos-latest
     steps:
@@ -66,9 +66,9 @@ jobs:
           retention-days: 2
 
   # ==========================================
-  # 2. Build Windows (.zip)
+  # 2. Build Windows (.exe setup & .zip)
   # ==========================================
-  build-windows:
+  build_windows:
     name: Build Windows
     runs-on: windows-latest
     steps:
@@ -91,8 +91,23 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup -y
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer\jronix_post_setup.iss
-          Move-Item -Path "build\windows\installer\Jronix-Post-Windows-Setup.exe" -Destination "${{ github.workspace }}\Jronix-Post-Windows-Setup.exe"
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            $iscc = (Get-ChildItem -Path "C:\Program Files*", "C:\Inno*" -Recurse -Filter "ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName)
+          }
+          if (-not $iscc) {
+            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          }
+          Write-Host "Inno Setup compiler located at: $iscc"
+          New-Item -ItemType Directory -Force -Path "build\windows\installer"
+          & "$iscc" windows\installer\jronix_post_setup.iss
+          if (Test-Path "build\windows\installer\Jronix-Post-Windows-Setup.exe") {
+            Move-Item -Path "build\windows\installer\Jronix-Post-Windows-Setup.exe" -Destination "${{ github.workspace }}\Jronix-Post-Windows-Setup.exe"
+          } else {
+            Write-Error "Installer .exe was not generated"
+            exit 1
+          }
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "Jronix-Post-Windows-x64.zip"
 
       - name: Upload Windows Artifacts
@@ -107,7 +122,7 @@ jobs:
   # ==========================================
   # 3. Build Linux (.tar.gz)
   # ==========================================
-  build-linux:
+  build_linux:
     name: Build Linux
     runs-on: ubuntu-latest
     steps:
@@ -133,16 +148,7 @@ jobs:
 
       - name: Package Linux App (.tar.gz)
         run: |
-          cat << 'EOF' > build/linux/x64/release/bundle/jronixpost.desktop
-[Desktop Entry]
-Name=Jronix Post
-Comment=Next-gen API, Socket.IO & WebSocket Client
-Exec=./jronixpost
-Icon=jronixpost
-Terminal=false
-Type=Application
-Categories=Development;
-EOF
+          printf "[Desktop Entry]\nName=Jronix Post\nComment=Next-gen API, Socket.IO & WebSocket Client\nExec=./jronixpost\nIcon=jronixpost\nTerminal=false\nType=Application\nCategories=Development;\n" > build/linux/x64/release/bundle/jronixpost.desktop
           cp assets/icons/main_logo.png build/linux/x64/release/bundle/jronixpost.png
           chmod +x build/linux/x64/release/bundle/jronixpost || true
           tar -czvf Jronix-Post-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
@@ -157,10 +163,10 @@ EOF
   # ==========================================
   # 4. Create / Update GitHub Release
   # ==========================================
-  publish-release:
+  publish_release:
     name: Publish Release Assets
-    needs: [build-macos, build-windows, build-linux]
-    if: always() && (needs.build-macos.result == 'success' || needs.build-windows.result == 'success' || needs.build-linux.result == 'success')
+    needs: [build_macos, build_windows, build_linux]
+    if: always() && (needs.build_macos.result == 'success' || needs.build_windows.result == 'success' || needs.build_linux.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Determine Release Tag
@@ -190,6 +196,7 @@ EOF
           draft: false
           prerelease: false
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
             release-assets/Jronix-Post-macOS.dmg
             release-assets/Jronix-Post-macOS.zip
