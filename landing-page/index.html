@@ -35,10 +35,11 @@
       <a href="#" class="brand-link">
         <img src="assets/logo.png" alt="Jronix Post Logo" class="brand-logo">
         <span class="brand-name">Jronix <span>Post</span></span>
-        <span class="brand-badge">v1.2</span>
+        <span class="brand-badge">v1.3</span>
       </a>
 
       <nav class="nav-menu" id="navMenu">
+        <a href="#whats-new" class="nav-link">What's New</a>
         <a href="#features" class="nav-link">Features</a>
         <a href="#realtime" class="nav-link">Socket.IO & WS</a>
         <a href="#rest" class="nav-link">REST Client</a>
@@ -76,8 +77,8 @@
     <div class="container hero-container">
       <div class="hero-badge">
         <span class="pulse-dot"></span>
-        <span class="badge-text">Next-Gen API & Real-Time Workspace</span>
-        <span class="badge-chip">Native Socket.IO & WS</span>
+        <span class="badge-text">v1.3 Released: Drag &amp; Drop, Smart Headers, Variable Cards</span>
+        <a href="#whats-new" class="badge-chip" style="text-decoration: none; color: inherit;">See What's New →</a>
       </div>
 
       <h1 class="hero-title">
@@ -325,6 +326,61 @@
             </div>
             <a href="assets/app_preview.png" target="_blank" class="preview-link">Open Full Resolution Screenshot →</a>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What's New in v1.3 Feature Banner -->
+  <section class="whats-new-section" id="whats-new" style="padding: 3rem 0; background: linear-gradient(180deg, rgba(255, 108, 55, 0.05) 0%, rgba(13, 15, 24, 0) 100%); border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+    <div class="container">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 2rem;">
+        <div>
+          <div class="section-badge" style="background: rgba(255, 108, 55, 0.15); color: #ff6c37; border: 1px solid rgba(255, 108, 55, 0.3);">🚀 Latest Release</div>
+          <h2 style="font-size: 2rem; font-weight: 800; color: #fff; margin-top: 0.5rem; letter-spacing: -0.5px;">
+            What's New in <span class="gradient-orange">Jronix Post v1.3</span>
+          </h2>
+          <p style="font-size: 0.95rem; color: #94a3b8; margin: 0.25rem 0 0;">
+            A major leap forward in workspace organization, request autocompletion, and team synchronization.
+          </p>
+        </div>
+        <a href="#download" class="btn btn-primary btn-md">
+          <span>Download v1.3 Update Free</span>
+          <svg class="icon" viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </a>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem;">
+        <div style="background: rgba(21, 24, 40, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+          <div style="font-size: 1.75rem; margin-bottom: 0.75rem;">🗂️</div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Sidebar Drag &amp; Drop Reordering</h3>
+          <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin: 0;">Easily reorder collections, nested subfolders, and requests up and down with smooth grab-and-drop handles.</p>
+        </div>
+
+        <div style="background: rgba(21, 24, 40, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+          <div style="font-size: 1.75rem; margin-bottom: 0.75rem;">⚡</div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Intelligent Header Autocomplete</h3>
+          <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin: 0;">Comprehensive HTTP header suggestions with fuzzy search and automatic typo correction (e.g. autherization → Authorization).</p>
+        </div>
+
+        <div style="background: rgba(21, 24, 40, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+          <div style="font-size: 1.75rem; margin-bottom: 0.75rem;">🔍</div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Variable Inspection Cards</h3>
+          <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin: 0;">Hover over any <code>{{variable}}</code> in headers or tables to preview resolved values, scopes, and Bearer keyword syntax highlighting.</p>
+        </div>
+
+        <div style="background: rgba(21, 24, 40, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+          <div style="font-size: 1.75rem; margin-bottom: 0.75rem;">🔌</div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Multi-Protocol Persistent Tabs</h3>
+          <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin: 0;">Keep HTTP, Socket.IO, and WebSocket tabs open side-by-side with dedicated orange <strong>IO</strong> and purple <strong>WS</strong> badges.</p>
+        </div>
+
+        <div style="background: rgba(21, 24, 40, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+          <div style="font-size: 1.75rem; margin-bottom: 0.75rem;">🔄</div>
+          <h3 style="font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">1-Click Fast Workspace Sync</h3>
+          <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin: 0;">Spinning 360° sync button with shimmer loader in the sidebar keeps team projects instantly in sync with the cloud.</p>
         </div>
       </div>
     </div>
