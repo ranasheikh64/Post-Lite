@@ -203,3 +203,18 @@ jobs:
             release-assets/Jronix-Post-Windows-Setup.exe
             release-assets/Jronix-Post-Windows-x64.zip
             release-assets/Jronix-Post-Linux-x64.tar.gz
+
+      - name: Trigger Email Notification Broadcast to All Users
+        if: success()
+        env:
+          BACKEND_URL: "https://post-lite-backend.vercel.app"
+          BROADCAST_SECRET: ${{ secrets.BROADCAST_SECRET || secrets.JWT_SECRET }}
+        run: |
+          echo "Broadcasting update notification to registered users..."
+          curl -s -X POST "$BACKEND_URL/updates/broadcast" \
+            -H "Content-Type: application/json" \
+            -H "x-broadcast-secret: $BROADCAST_SECRET" \
+            -d '{
+              "version": "${{ steps.tag_info.outputs.release_tag }}",
+              "landingPageUrl": "https://jronix-post.vercel.app/#download"
+            }' || echo "Broadcast API call completed"

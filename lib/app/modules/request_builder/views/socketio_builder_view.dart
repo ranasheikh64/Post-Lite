@@ -231,52 +231,6 @@ class _SocketIOBuilderViewState extends State<SocketIOBuilderView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top Breadcrumb & Actions Row
-        Padding(
-          padding: const EdgeInsets.only(
-            left: 16.0,
-            right: 16.0,
-            top: 12.0,
-            bottom: 8.0,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Obx(
-                  () => Text(
-                    '${reqController.currentPath.value} > ${reqController.currentRequestId.value == null
-                        ? "New Socket.io Request"
-                        : reqController.url.value.split("/").last.isEmpty
-                        ? "Unnamed Socket.io Request"
-                        : reqController.url.value.split("/").last}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => reqController.saveChanges(),
-                    icon: const Icon(Icons.save, size: 16),
-                    label: const Text('Save'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey[300],
-                      side: BorderSide(color: Colors.grey[800]!),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      minimumSize: const Size(0, 32),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
         // URL Bar Row
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),

@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'jsonc_formatter.dart';
 
 class CodeFormatter {
   static String? format({
@@ -10,16 +10,17 @@ class CodeFormatter {
 
     final normFormat = format.toLowerCase();
     if (normFormat == 'json' || normFormat.isEmpty) {
-      final clean = stripJsonComments(trimmed);
-      final decoded = jsonDecode(clean);
-      return const JsonEncoder.withIndent('  ').convert(decoded);
+      try {
+        return JsoncFormatter.format(trimmed);
+      } catch (_) {
+        return null;
+      }
     } else if (normFormat == 'xml' || normFormat == 'html') {
       return _formatXml(trimmed);
     }
 
     try {
-      final decoded = jsonDecode(trimmed);
-      return const JsonEncoder.withIndent('  ').convert(decoded);
+      return JsoncFormatter.format(trimmed);
     } catch (_) {
       return null;
     }

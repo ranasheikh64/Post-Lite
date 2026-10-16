@@ -10,12 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 import 'package:postmanclone/app/widgets/custom_loader.dart';
+import 'package:postmanclone/app/modules/home/widgets/dialogs/app_update_dialog.dart';
 
 class WorkspaceController extends GetxController {
   final ApiService _apiService = ApiService();
 
   final collections = <dynamic>[].obs;
   final isLoading = false.obs;
+  final isSyncing = false.obs;
 
   final workspaces = <dynamic>[].obs;
   final selectedWorkspaceId = RxnString();
@@ -456,6 +458,29 @@ class WorkspaceController extends GetxController {
     } else {
       switchWorkspace(null);
     }
+    _checkAppUpdate();
+  }
+
+  Future<void> _checkAppUpdate() async {
+    try {
+      final updateData = await _apiService.getLatestUpdate();
+      if (updateData != null && updateData['version'] != null) {
+        final serverVersion = updateData['version'].toString();
+        final prefs = await SharedPreferences.getInstance();
+        final dismissed = prefs.getString('dismissed_version');
+        if (dismissed != serverVersion) {
+          final highlights = (updateData['releaseHighlights'] as List?) ?? [];
+          final downloadUrl = updateData['landingPageUrl']?.toString() ?? 'https://jronix-post.vercel.app/#download';
+          Future.delayed(const Duration(seconds: 3), () {
+            AppUpdateDialog.show(
+              version: serverVersion,
+              highlights: highlights,
+              downloadUrl: downloadUrl,
+            );
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> fetchWorkspaces() async {
@@ -632,9 +657,9 @@ class WorkspaceController extends GetxController {
     }
   }
 
-  Future<void> fetchCollections({bool showLoading = true}) async {
+  Future<void> fetchCollections({bool showLoading = true, bool forceLoading = false}) async {
     try {
-      if (showLoading && collections.isEmpty) {
+      if (forceLoading || (showLoading && collections.isEmpty)) {
         isLoading.value = true;
       }
       final data = await _apiService.getCollections(
@@ -654,6 +679,28 @@ class WorkspaceController extends GetxController {
       // CustomSnackbar.show(title: 'Error', message: 'Failed to fetch collections', isError: true);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> syncWorkspace() async {
+    if (isSyncing.value) return;
+    isSyncing.value = true;
+    try {
+      await fetchWorkspaces();
+      await fetchCollections(forceLoading: true);
+      CustomSnackbar.show(
+        title: 'Synced',
+        message: 'All projects and collections updated successfully.',
+        isError: false,
+      );
+    } catch (e) {
+      CustomSnackbar.show(
+        title: 'Sync Error',
+        message: 'Failed to sync latest changes.',
+        isError: true,
+      );
+    } finally {
+      isSyncing.value = false;
     }
   }
 
@@ -965,6 +1012,41 @@ class WorkspaceController extends GetxController {
       CustomSnackbar.show(
         title: 'Error',
         message: 'Failed to save new order',
+        isError: true,
+      );
+      await fetchCollections(); // revert on failure
+    }
+  }
+
+  Future<void> reorderFolders(
+    List<dynamic> folderList,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    // Optimistic UI update
+    final item = folderList.removeAt(oldIndex);
+    folderList.insert(newIndex, item);
+    collections.refresh(); // trigger Obx update
+
+    try {
+      final folderIds = folderList
+          .map<String>((f) => f['_id'] as String)
+          .toList();
+      await _apiService.reorderCollections(folderIds);
+    } catch (e, stack) {
+      log(
+        'Failed to reorder folders',
+        error: e,
+        stackTrace: stack,
+        name: 'WorkspaceController',
+      );
+      CustomSnackbar.show(
+        title: 'Error',
+        message: 'Failed to save new folder order',
         isError: true,
       );
       await fetchCollections(); // revert on failure

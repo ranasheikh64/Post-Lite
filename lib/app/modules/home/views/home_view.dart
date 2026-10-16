@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../request_builder/controllers/request_builder_controller.dart';
 import 'package:postmanclone/app/core/theme/app_theme.dart';
 import 'package:postmanclone/app/routes/app_routes.dart';
@@ -19,6 +19,8 @@ import '../widgets/dialogs/variables_dialog.dart';
 import '../widgets/dialogs/add_request_dialog.dart';
 import '../widgets/dialogs/rename_request_dialog.dart';
 import '../widgets/global_search_widget.dart';
+import '../widgets/top_bar_sync_button.dart';
+import '../widgets/sidebar_shimmer_loader.dart';
 
 class HomeView extends GetView<WorkspaceController> {
   HomeView({super.key});
@@ -30,22 +32,68 @@ class HomeView extends GetView<WorkspaceController> {
 
   @override
   Widget build(BuildContext context) {
-    return DropTarget(
-      onDragDone: (detail) async {
-        for (final file in detail.files) {
-          if (file.name.toLowerCase().endsWith('.json')) {
-            try {
-              final content = await file.readAsString();
-              await workspaceController.importPostmanCollection(content);
-            } catch (e) {
-              debugPrint('Failed to read dropped file: $e');
-            }
+    final reqBuilder = Get.find<RequestBuilderController>();
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (reqBuilder.hasAnyUnsavedChanges()) {
+          final shouldExit = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF222533),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Unsaved Changes', style: TextStyle(color: Colors.white, fontSize: 18)),
+                ],
+              ),
+              content: const Text(
+                'You have unsaved changes in your open tabs. Are you sure you want to close and lose them?',
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                  child: const Text('Discard & Exit', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+          if (shouldExit == true) {
+            SystemNavigator.pop();
           }
+        } else {
+          SystemNavigator.pop();
         }
       },
-      child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
+      child: DropTarget(
+        onDragDone: (detail) async {
+          for (final file in detail.files) {
+            if (file.name.toLowerCase().endsWith('.json')) {
+              try {
+                final content = await file.readAsString();
+                await workspaceController.importPostmanCollection(content);
+              } catch (e) {
+                debugPrint('Failed to read dropped file: $e');
+              }
+            }
+          }
+        },
+        child: Scaffold(
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(52),
           child: Container(
             decoration: const BoxDecoration(
               color: Color(0xFF1A1C27),
@@ -92,20 +140,7 @@ class HomeView extends GetView<WorkspaceController> {
                 ),
                 const SizedBox(width: 24),
                 // Actions
-                Tooltip(
-                  message: 'Sync',
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {},
-                      borderRadius: BorderRadius.circular(6),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-                        child: Icon(Icons.sync_rounded, size: 18, color: Color(0xFF9E9E9E)),
-                      ),
-                    ),
-                  ),
-                ),
+                const TopBarSyncButton(),
                 Tooltip(
                   message: 'Settings',
                   child: Material(
@@ -447,48 +482,37 @@ class HomeView extends GetView<WorkspaceController> {
                           Expanded(
                             child: Obx(() {
                               if (workspaceController.isLoading.value) {
-                                return ListView.builder(
-                                  itemCount: 5,
-                                  itemBuilder: (context, index) {
-                                    return Shimmer.fromColors(
-                                      baseColor: Colors.grey[800]!,
-                                      highlightColor: Colors.grey[700]!,
-                                      child: ListTile(
-                                        leading: const Icon(
-                                          Icons.folder,
-                                          color: Colors.white,
-                                        ),
-                                        title: Container(
-                                          height: 14,
-                                          width: double.infinity,
-                                          color: Colors.white,
-                                          margin: const EdgeInsets.only(
-                                            right: 50,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
+                                return const SidebarShimmerLoader();
                               }
                               if (workspaceController.collections.isEmpty) {
                                 return const Center(
                                   child: Text('No collections yet.'),
                                 );
                               }
-                              return CustomScrollView(
-                                slivers: [
-                                  for (int index = 0;
-                                      index <
-                                          workspaceController
-                                              .collections.length;
-                                      index++)
-                                    _buildRootCollectionSliver(
-                                      context,
-                                      workspaceController.collections[index],
-                                      workspaceController.collections,
-                                    ),
-                                ],
+                              return ReorderableListView.builder(
+                                buildDefaultDragHandles: false,
+                                itemCount: workspaceController.collections.length,
+                                proxyDecorator: (child, index, animation) => Material(
+                                  color: const Color(0xFF1E2133),
+                                  borderRadius: BorderRadius.circular(4),
+                                  elevation: 6,
+                                  child: child,
+                                ),
+                                onReorder: (oldIndex, newIndex) {
+                                  workspaceController.reorderFolders(
+                                    workspaceController.collections,
+                                    oldIndex,
+                                    newIndex,
+                                  );
+                                },
+                                itemBuilder: (context, index) {
+                                  return _buildRootCollectionItem(
+                                    context,
+                                    workspaceController.collections[index],
+                                    workspaceController.collections,
+                                    index,
+                                  );
+                                },
                               );
                             }),
                           ),
@@ -556,6 +580,7 @@ class HomeView extends GetView<WorkspaceController> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -580,50 +605,67 @@ class HomeView extends GetView<WorkspaceController> {
     );
   }
 
-  Widget _buildRootCollectionSliver(
+  Widget _buildRootCollectionItem(
     BuildContext context,
     dynamic collection,
     List<dynamic> parentList,
+    int index,
   ) {
     final collectionId = collection['_id'];
-    return Obx(() {
-      final isExpanded = workspaceController.isCollectionExpanded(collectionId);
-      final folders = (collection['folders'] as List?) ?? [];
-      final requests = (collection['requests'] as List?) ?? [];
-      final currentPath = 'Workspace > ${collection['name']}';
+    return Container(
+      key: ValueKey('root_col_$collectionId'),
+      child: Obx(() {
+        final isExpanded = workspaceController.isCollectionExpanded(collectionId);
+        final folders = (collection['folders'] as List?) ?? [];
+        final requests = (collection['requests'] as List?) ?? [];
+        final currentPath = 'Workspace > ${collection['name']}';
 
-      return SliverMainAxisGroup(
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _CollectionHeaderDelegate(
-              height: 48.0,
-              builder: (ctx, isPinned) {
-                return _buildCollectionHeaderTile(
-                  ctx,
-                  collection,
-                  parentList,
-                  isExpanded,
-                  isPinned,
-                );
-              },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildCollectionHeaderTile(
+              context,
+              collection,
+              parentList,
+              isExpanded,
+              false,
+              index: index,
             ),
-          ),
-          if (isExpanded)
-            SliverToBoxAdapter(
-              child: Column(
+            if (isExpanded)
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Render sub-folders
-                  ...folders.map(
-                    (f) => _buildCollectionNode(
-                      context,
-                      f,
-                      folders,
-                      1,
-                      parentPath: currentPath,
+                  if (folders.isNotEmpty)
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      buildDefaultDragHandles: false,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: folders.length,
+                      proxyDecorator: (child, index, animation) => Material(
+                        color: const Color(0xFF1E2133),
+                        borderRadius: BorderRadius.circular(4),
+                        child: child,
+                      ),
+                      onReorder: (oldIndex, newIndex) {
+                        workspaceController.reorderFolders(
+                          folders,
+                          oldIndex,
+                          newIndex,
+                        );
+                      },
+                      itemBuilder: (context, idx) {
+                        final f = folders[idx];
+                        return _buildCollectionNode(
+                          context,
+                          f,
+                          folders,
+                          1,
+                          parentPath: currentPath,
+                          index: idx,
+                        );
+                      },
                     ),
-                  ),
                   // Render requests with ReorderableListView
                   if (requests.isNotEmpty)
                     ReorderableListView.builder(
@@ -631,6 +673,11 @@ class HomeView extends GetView<WorkspaceController> {
                       buildDefaultDragHandles: false,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: requests.length,
+                      proxyDecorator: (child, index, animation) => Material(
+                        color: const Color(0xFF1E2133),
+                        borderRadius: BorderRadius.circular(4),
+                        child: child,
+                      ),
                       onReorder: (oldIndex, newIndex) {
                         workspaceController.reorderRequests(
                           requests,
@@ -652,10 +699,10 @@ class HomeView extends GetView<WorkspaceController> {
                     ),
                 ],
               ),
-            ),
-        ],
-      );
-    });
+          ],
+        );
+      }),
+    );
   }
 
   Widget _buildCollectionHeaderTile(
@@ -663,8 +710,9 @@ class HomeView extends GetView<WorkspaceController> {
     dynamic collection,
     List<dynamic> parentList,
     bool isExpanded,
-    bool isPinned,
-  ) {
+    bool isPinned, {
+    int? index,
+  }) {
     final requests = collection['requests'] ?? [];
     final collectionId = collection['_id'];
 
@@ -739,6 +787,22 @@ class HomeView extends GetView<WorkspaceController> {
                       },
                     );
                   }),
+                  if (index != null &&
+                      !workspaceController.isSelectionMode.value &&
+                      workspaceController.userRoleInWorkspace.value != 'viewer') ...[
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const MouseRegion(
+                        cursor: SystemMouseCursors.grab,
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 14,
+                          color: Color(0xFF555870),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Icon(
                     isExpanded
                         ? Icons.folder_open_outlined
@@ -1039,149 +1103,188 @@ class HomeView extends GetView<WorkspaceController> {
     List<dynamic> parentList,
     int depth, {
     String parentPath = 'Workspace',
+    int? index,
   }) {
     final requests = collection['requests'] ?? [];
     final folders = collection['folders'] ?? [];
     final currentPath = '$parentPath > ${collection['name']}';
 
-    return Obx(
-      () => Dismissible(
-        key: ValueKey('collection_${collection['_id']}'),
-        direction: workspaceController.userRoleInWorkspace.value == 'viewer'
-            ? DismissDirection.none
-            : DismissDirection.endToStart,
-        background: Container(
-          color: Colors.redAccent,
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 16.0),
-          child: const Icon(Icons.delete, color: Colors.white),
-        ),
-        confirmDismiss: (direction) async {
-          return await _confirmDelete(
-            context,
-            collection['name'] ?? 'Collection',
-          );
-        },
-        onDismissed: (direction) {
-          parentList.remove(collection);
-          workspaceController.collections.refresh();
-          workspaceController.deleteCollection(collection['_id']);
-        },
-        child: ExpansionTile(
-          tilePadding: EdgeInsets.only(
-            left: 16.0 + (depth * 16.0),
-            right: 16.0,
+    return Container(
+      key: ValueKey('folder_${collection['_id']}'),
+      child: Obx(
+        () => Dismissible(
+          key: ValueKey('collection_dismiss_${collection['_id']}'),
+          direction: workspaceController.userRoleInWorkspace.value == 'viewer'
+              ? DismissDirection.none
+              : DismissDirection.endToStart,
+          background: Container(
+            color: Colors.redAccent,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 16.0),
+            child: const Icon(Icons.delete, color: Colors.white),
           ),
-          leading: Obx(
-            () => Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (workspaceController.isSelectionMode.value)
-                  Checkbox(
-                    value: workspaceController.selectedCollectionIds.contains(
-                      collection['_id'],
-                    ),
-                    onChanged: (val) {
-                      workspaceController.toggleCollectionSelection(
-                        collection['_id'],
-                      );
-                    },
-                  ),
-                Icon(
-                  depth == 0
-                      ? Icons.folder_outlined
-                      : Icons.folder_open_outlined,
-                  color: AppTheme.textSecondary,
-                  size: 20,
-                ),
-              ],
+          confirmDismiss: (direction) async {
+            return await _confirmDelete(
+              context,
+              collection['name'] ?? 'Collection',
+            );
+          },
+          onDismissed: (direction) {
+            parentList.remove(collection);
+            workspaceController.collections.refresh();
+            workspaceController.deleteCollection(collection['_id']);
+          },
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.only(
+              left: 16.0 + (depth * 16.0),
+              right: 16.0,
             ),
-          ),
-          title: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  collection['name'] ?? 'Unnamed',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (requests.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[850],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${requests.length}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.white54,
-                        fontWeight: FontWeight.w600,
+            leading: Obx(
+              () => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (workspaceController.isSelectionMode.value)
+                    Checkbox(
+                      value: workspaceController.selectedCollectionIds.contains(
+                        collection['_id'],
+                      ),
+                      onChanged: (val) {
+                        workspaceController.toggleCollectionSelection(
+                          collection['_id'],
+                        );
+                      },
+                    )
+                  else if (index != null &&
+                      workspaceController.userRoleInWorkspace.value != 'viewer')
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const MouseRegion(
+                        cursor: SystemMouseCursors.grab,
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 14,
+                          color: Color(0xFF555870),
+                        ),
                       ),
                     ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    depth == 0
+                        ? Icons.folder_outlined
+                        : Icons.folder_open_outlined,
+                    color: AppTheme.textSecondary,
+                    size: 20,
                   ),
                 ],
-                const SizedBox(width: 8),
-                Obx(
-                  () =>
-                      workspaceController.userRoleInWorkspace.value == 'viewer'
-                      ? const SizedBox.shrink()
-                      : _buildCollectionPopupMenu(
-                          context,
-                          collection,
-                          depth: depth,
+              ),
+            ),
+            title: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    collection['name'] ?? 'Unnamed',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (requests.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[850],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${requests.length}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  Obx(
+                    () =>
+                        workspaceController.userRoleInWorkspace.value == 'viewer'
+                        ? const SizedBox.shrink()
+                        : _buildCollectionPopupMenu(
+                            context,
+                            collection,
+                            depth: depth,
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            children: [
+              // Render sub-folders
+              if (folders.isNotEmpty)
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  buildDefaultDragHandles: false,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: folders.length,
+                  proxyDecorator: (child, index, animation) => Material(
+                    color: const Color(0xFF1E2133),
+                    borderRadius: BorderRadius.circular(4),
+                    child: child,
+                  ),
+                  onReorder: (oldIndex, newIndex) {
+                    workspaceController.reorderFolders(
+                      folders,
+                      oldIndex,
+                      newIndex,
+                    );
+                  },
+                  itemBuilder: (context, idx) {
+                    final f = folders[idx];
+                    return _buildCollectionNode(
+                      context,
+                      f,
+                      folders,
+                      depth + 1,
+                      parentPath: currentPath,
+                      index: idx,
+                    );
+                  },
                 ),
-              ],
-            ),
+              // Render requests with ReorderableListView
+              if (requests.isNotEmpty)
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  buildDefaultDragHandles: false,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: requests.length,
+                  onReorder: (oldIndex, newIndex) {
+                    workspaceController.reorderRequests(
+                      requests,
+                      oldIndex,
+                      newIndex,
+                    );
+                  },
+                  itemBuilder: (context, idx) {
+                    final req = requests[idx];
+                    return _buildRequestItem(
+                      req,
+                      requests,
+                      depth,
+                      ValueKey(req['_id']),
+                      currentPath,
+                      idx,
+                    );
+                  },
+                ),
+            ],
           ),
-          children: [
-            // Render sub-folders
-            ...folders.map(
-              (f) => _buildCollectionNode(
-                context,
-                f,
-                folders,
-                depth + 1,
-                parentPath: currentPath,
-              ),
-            ),
-            // Render requests with ReorderableListView
-            if (requests.isNotEmpty)
-              ReorderableListView.builder(
-                shrinkWrap: true,
-                buildDefaultDragHandles: false,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: requests.length,
-                onReorder: (oldIndex, newIndex) {
-                  workspaceController.reorderRequests(
-                    requests,
-                    oldIndex,
-                    newIndex,
-                  );
-                },
-                itemBuilder: (context, idx) {
-                  final req = requests[idx];
-                  return _buildRequestItem(
-                    req,
-                    requests,
-                    depth,
-                    ValueKey(req['_id']),
-                    currentPath,
-                    idx,
-                  );
-                },
-              ),
-          ],
         ),
       ),
     );
@@ -1239,37 +1342,10 @@ class HomeView extends GetView<WorkspaceController> {
                       if (workspaceController.isSelectionMode.value) {
                         workspaceController.toggleRequestSelection(req['_id']);
                       } else {
-                        if (reqBuilder.hasUnsavedChanges.value &&
-                            reqBuilder.currentRequestId.value != req['_id']) {
-                          Get.defaultDialog(
-                            title: 'Unsaved Changes',
-                            middleText:
-                                'You have unsaved changes. Save before switching?',
-                            textConfirm: 'Save',
-                            textCancel: 'Discard',
-                            confirmTextColor: Colors.white,
-                            buttonColor: Colors.blue,
-                            onConfirm: () async {
-                              await reqBuilder.saveChanges();
-                              Get.back();
-                              reqBuilder.loadRequest(
-                                Map<String, dynamic>.from(req),
-                                path: path,
-                              );
-                            },
-                            onCancel: () {
-                              reqBuilder.loadRequest(
-                                Map<String, dynamic>.from(req),
-                                path: path,
-                              );
-                            },
-                          );
-                        } else {
-                          reqBuilder.loadRequest(
-                            Map<String, dynamic>.from(req),
-                            path: path,
-                          );
-                        }
+                        reqBuilder.loadRequest(
+                          Map<String, dynamic>.from(req),
+                          path: path,
+                        );
                       }
                     },
                     child: Container(
@@ -1586,27 +1662,7 @@ class HomeView extends GetView<WorkspaceController> {
         ),
         trailing: const Icon(Icons.more_horiz, size: 14, color: Colors.grey),
         onTap: () {
-          if (reqBuilder.hasUnsavedChanges.value &&
-              reqBuilder.currentRequestId.value != req['_id']) {
-            Get.defaultDialog(
-              title: 'Unsaved Changes',
-              middleText: 'You have unsaved changes. Save before switching?',
-              textConfirm: 'Save',
-              textCancel: 'Discard',
-              confirmTextColor: Colors.white,
-              buttonColor: Colors.blue,
-              onConfirm: () async {
-                await reqBuilder.saveChanges();
-                Get.back();
-                reqBuilder.loadSavedResponse(req, res, path: path);
-              },
-              onCancel: () {
-                reqBuilder.loadSavedResponse(req, res, path: path);
-              },
-            );
-          } else {
-            reqBuilder.loadSavedResponse(req, res, path: path);
-          }
+          reqBuilder.loadSavedResponse(req, res, path: path);
         },
       ),
     );
@@ -1630,36 +1686,5 @@ class HomeView extends GetView<WorkspaceController> {
     if (status >= 400 && status < 500) return AppTheme.postMethod;
     if (status >= 500) return AppTheme.deleteMethod;
     return AppTheme.putMethod;
-  }
-}
-
-class _CollectionHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double height;
-  final Widget Function(BuildContext context, bool isPinned) builder;
-
-  _CollectionHeaderDelegate({
-    required this.height,
-    required this.builder,
-  });
-
-  @override
-  double get minExtent => height;
-
-  @override
-  double get maxExtent => height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final isPinned = shrinkOffset > 0 || overlapsContent;
-    return builder(context, isPinned);
-  }
-
-  @override
-  bool shouldRebuild(covariant _CollectionHeaderDelegate oldDelegate) {
-    return true;
   }
 }

@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:postmanclone/app/widgets/custom_json_viewer.dart';
 import 'package:get/get.dart';
@@ -11,314 +9,42 @@ import '../controllers/request_builder_controller.dart';
 import 'websocket_builder_view.dart';
 import 'socketio_builder_view.dart';
 import '../../../widgets/interactive_tooltip.dart';
-import '../widgets/code_snippet_dialog.dart';
 import '../widgets/raw_body_editor.dart';
 import '../widgets/dynamic_table_view.dart';
+import '../widgets/request_top_bar.dart';
 
 class RequestBuilderView extends GetView<RequestBuilderController> {
   const RequestBuilderView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      if (controller.requestKind.value == 'websocket') {
-        return WebSocketBuilderView(
-          key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
-        );
-      } else if (controller.requestKind.value == 'socketio') {
-        return SocketIOBuilderView(
-          key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
-        );
-      }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const RequestTopBar(),
+        Expanded(
+          child: Obx(() {
+            if (controller.requestKind.value == 'websocket') {
+              return WebSocketBuilderView(
+                key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
+              );
+            } else if (controller.requestKind.value == 'socketio') {
+              return SocketIOBuilderView(
+                key: ValueKey(controller.currentRequestId.value ?? 'new_request'),
+              );
+            }
+            return _buildHttpRequestBuilder(context);
+          }),
+        ),
+      ],
+    );
+  }
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Top Breadcrumb & Actions Row
-          Padding(
-            padding: const EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              top: 12.0,
-              bottom: 8.0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Obx(() {
-                    if (controller.openRequests.isEmpty) {
-                      return const Text(
-                        'No active requests',
-                        style: TextStyle(color: Colors.white54, fontSize: 13),
-                      );
-                    }
-                    return Listener(
-                      onPointerDown: (event) {
-                        if (kIsWeb && event.buttons == kSecondaryMouseButton) {
-                          BrowserContextMenu.disableContextMenu();
-                        }
-                      },
-                      onPointerUp: (event) {
-                        if (kIsWeb && event.buttons == kSecondaryButton) {
-                          Future.delayed(const Duration(milliseconds: 300), () {
-                            BrowserContextMenu.enableContextMenu();
-                          });
-                        }
-                      },
-                      child: SizedBox(
-                        height: 36,
-                        child: ReorderableListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          scrollController: controller.tabsScrollController,
-                          buildDefaultDragHandles: false,
-                          itemCount: controller.openRequests.length,
-                          onReorder: (oldIndex, newIndex) {
-                            controller.reorderRequests(oldIndex, newIndex);
-                          },
-                          itemBuilder: (context, index) {
-                            final req = controller.openRequests[index];
-                            final isActive =
-                                req['_id'] == controller.currentRequestId.value;
-                            return ReorderableDragStartListener(
-                              key: ValueKey(req['_id']),
-                              index: index,
-                              child: GestureDetector(
-                                onSecondaryTapDown: (details) {
-                                  showMenu(
-                                    context: context,
-                                    position: RelativeRect.fromLTRB(
-                                      details.globalPosition.dx,
-                                      details.globalPosition.dy,
-                                      details.globalPosition.dx,
-                                      details.globalPosition.dy,
-                                    ),
-                                    items: const [
-                                      PopupMenuItem(
-                                        value: 'close_others',
-                                        child: Text(
-                                          'Close other tabs',
-                                          style: TextStyle(fontSize: 13),
-                                        ),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'close_right',
-                                        child: Text(
-                                          'Close tabs to the right',
-                                          style: TextStyle(fontSize: 13),
-                                        ),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'close_left',
-                                        child: Text(
-                                          'Close tabs to the left',
-                                          style: TextStyle(fontSize: 13),
-                                        ),
-                                      ),
-                                    ],
-                                    color: const Color(0xFF2A2D3E),
-                                  ).then((value) {
-                                    if (value == 'close_others') {
-                                      controller.closeOtherRequests(req['_id']);
-                                    } else if (value == 'close_right') {
-                                      controller.closeRequestsToRight(
-                                        req['_id'],
-                                      );
-                                    } else if (value == 'close_left') {
-                                      controller.closeRequestsToLeft(
-                                        req['_id'],
-                                      );
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 4),
-                                  decoration: BoxDecoration(
-                                    color: isActive
-                                        ? const Color(0xFF2A2D3E)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: InkWell(
-                                    onTap: () => controller.loadRequest(
-                                      req,
-                                      path: 'Recent > ${req['name']}',
-                                    ),
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            req['method'] ?? 'GET',
-                                            style: TextStyle(
-                                              color: AppTheme.getMethodColor(
-                                                req['method'] ?? 'GET',
-                                              ),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            req['name'] ?? 'Unnamed',
-                                            style: TextStyle(
-                                              color: isActive
-                                                  ? Colors.white
-                                                  : Colors.white54,
-                                              fontSize: 13,
-                                              fontWeight: isActive
-                                                  ? FontWeight.w500
-                                                  : FontWeight.normal,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          InkWell(
-                                            onTap: () {
-                                              controller.openRequests
-                                                  .removeWhere(
-                                                    (r) =>
-                                                        r['_id'] == req['_id'],
-                                                  );
-                                              if (isActive) {
-                                                if (controller
-                                                    .openRequests
-                                                    .isNotEmpty) {
-                                                  final lastReq = controller
-                                                      .openRequests
-                                                      .last;
-                                                  controller.loadRequest(
-                                                    lastReq,
-                                                    path:
-                                                        'Recent > ${lastReq['name']}',
-                                                  );
-                                                } else {
-                                                  controller
-                                                          .currentRequestId
-                                                          .value =
-                                                      null;
-                                                }
-                                              }
-                                            },
-                                            child: const Icon(
-                                              Icons.close,
-                                              size: 14,
-                                              color: Colors.white38,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-                Row(
-                  children: [
-                    Obx(() {
-                      if (controller.openRequests.length <= 1) {
-                        return const SizedBox.shrink();
-                      }
-                      return Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF222533),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tooltip(
-                              message: 'Scroll tabs left',
-                              child: InkWell(
-                                onTap: controller.scrollTabsLeft,
-                                borderRadius: const BorderRadius.horizontal(
-                                  left: Radius.circular(5),
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 6,
-                                  ),
-                                  child: Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    size: 13,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 16,
-                              color: Colors.white12,
-                            ),
-                            Tooltip(
-                              message: 'Scroll tabs right',
-                              child: InkWell(
-                                onTap: controller.scrollTabsRight,
-                                borderRadius: const BorderRadius.horizontal(
-                                  right: Radius.circular(5),
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 6,
-                                  ),
-                                  child: Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 13,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    OutlinedButton.icon(
-                      onPressed: () => controller.saveChanges(),
-                      icon: const Icon(Icons.save, size: 16),
-                      label: const Text('Save'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey[300],
-                        side: BorderSide(color: Colors.grey[800]!),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        minimumSize: const Size(0, 32),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Code Snippet',
-                      onPressed: () {
-                        showCodeSnippetSidePanel(context, controller);
-                      },
-                      icon: const Icon(Icons.code, size: 18),
-                      color: Colors.grey[400],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // URL Bar Row
+  Widget _buildHttpRequestBuilder(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // URL Bar Row
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 16.0,
@@ -831,7 +557,6 @@ class RequestBuilderView extends GetView<RequestBuilderController> {
           ),
         ],
       );
-    });
   }
 
 

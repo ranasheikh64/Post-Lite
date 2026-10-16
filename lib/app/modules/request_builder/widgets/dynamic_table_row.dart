@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:postmanclone/app/widgets/variable_autocomplete.dart';
 import 'form_data_file_cell.dart';
+import 'table_field_autocomplete.dart';
 
 class DynamicTableRow extends StatefulWidget {
   final String title;
@@ -82,8 +82,10 @@ class _DynamicTableRowState extends State<DynamicTableRow> {
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.only(left: 10.0),
-                child: VariableAutocomplete(
+                child: TableFieldAutocomplete(
                   key: ValueKey('${widget.title}_key_$uid'),
+                  title: widget.title,
+                  isKey: true,
                   initialValue: keyVal,
                   onChanged: widget.onKeyChanged,
                   style: TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: hasContent ? const Color(0xFF9CDCFE) : const Color(0xFFD4D4D4)),
@@ -98,8 +100,11 @@ class _DynamicTableRowState extends State<DynamicTableRow> {
                 padding: const EdgeInsets.only(left: 10.0),
                 child: (widget.title == 'Form Data' && widget.item['type'] == 'file')
                     ? FormDataFileCell(filePath: valVal, onFileSelected: widget.onValChanged)
-                    : VariableAutocomplete(
+                    : TableFieldAutocomplete(
                         key: ValueKey('${widget.title}_val_$uid'),
+                        title: widget.title,
+                        isKey: false,
+                        headerKey: keyVal,
                         initialValue: valVal,
                         onChanged: widget.onValChanged,
                         style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Color(0xFFCE9178)),
@@ -141,5 +146,3 @@ class _DynamicTableRowState extends State<DynamicTableRow> {
     );
   }
 }
-
-

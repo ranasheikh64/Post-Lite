@@ -11,6 +11,8 @@ import 'dart:async';
 import 'package:postmanclone/app/modules/home/controllers/workspace_controller.dart';
 import 'package:postmanclone/app/widgets/variable_hover_card.dart';
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
+import 'package:postmanclone/app/data/models/request_tab_session.dart';
+import 'package:postmanclone/app/modules/request_builder/widgets/unsaved_changes_dialog.dart';
 
 class VariableTextEditingController extends TextEditingController {
   final RequestBuilderController reqController;
@@ -71,6 +73,7 @@ class RequestBuilderController extends GetxController {
   var currentRequestId = RxnString();
   var currentPath = 'Workspace > Collection'.obs;
   var openRequests = <Map<String, dynamic>>[].obs;
+  final Map<String, RequestTabSession> tabSessions = {};
 
   // -- Request State --
   var requestKind = 'http'.obs;
@@ -109,7 +112,6 @@ class RequestBuilderController extends GetxController {
   var originalSocketConfig = <String, dynamic>{};
   var originalSocketEvents = <Map<String, dynamic>>[];
   var hasUnsavedChanges = false.obs;
-  Timer? _autoSaveTimer;
 
   late final TextEditingController urlController =
       VariableTextEditingController(this);
@@ -190,7 +192,6 @@ class RequestBuilderController extends GetxController {
 
   @override
   void onClose() {
-    _autoSaveTimer?.cancel();
     tabsScrollController.dispose();
     super.onClose();
   }
@@ -420,13 +421,79 @@ class RequestBuilderController extends GetxController {
 
     hasUnsavedChanges.value = changed;
 
-    if (changed) {
-      _autoSaveTimer?.cancel();
-      _autoSaveTimer = Timer(const Duration(milliseconds: 1000), () {
-        if (hasUnsavedChanges.value) {
-          saveChanges(isAutoSave: true);
+    if (currentRequestId.value != null) {
+      if (tabSessions.containsKey(currentRequestId.value)) {
+        tabSessions[currentRequestId.value]!.hasUnsavedChanges = changed;
+      }
+      for (var req in openRequests) {
+        if (req['_id'] == currentRequestId.value) {
+          req['isUnsaved'] = changed;
+          openRequests.refresh();
+          break;
         }
-      });
+      }
+    }
+  }
+
+  bool isTabUnsaved(String id) {
+    if (id == currentRequestId.value) {
+      return hasUnsavedChanges.value;
+    }
+    return tabSessions[id]?.hasUnsavedChanges ?? false;
+  }
+
+  bool hasAnyUnsavedChanges() {
+    return openRequests.any((r) => isTabUnsaved(r['_id']?.toString() ?? ''));
+  }
+
+  void _saveCurrentTabState() {
+    final reqId = currentRequestId.value;
+    if (reqId == null) return;
+
+    var session = tabSessions[reqId];
+    if (session == null) {
+      final req = openRequests.firstWhereOrNull((r) => r['_id'] == reqId);
+      if (req != null) {
+        session = RequestTabSession.fromRequest(req, path: currentPath.value);
+        tabSessions[reqId] = session;
+      }
+    }
+
+    if (session != null) {
+      session.requestKind = requestKind.value;
+      session.method = method.value;
+      session.url = url.value;
+      session.docs = docs.value;
+      session.authType = authType.value;
+      session.authConfig = Map<String, dynamic>.from(authConfig);
+      session.headers = List<Map<String, dynamic>>.from(headers);
+      session.queryParams = List<Map<String, dynamic>>.from(queryParams);
+      session.bodyType = bodyType.value;
+      session.bodyFormat = bodyFormat.value;
+      session.body = body.value;
+      session.formData = List<Map<String, dynamic>>.from(formData);
+      session.urlEncodedData = List<Map<String, dynamic>>.from(urlEncodedData);
+      session.socketConfig = Map<String, dynamic>.from(socketConfig);
+      session.socketEvents = List<Map<String, dynamic>>.from(socketEvents);
+
+      session.hasUnsavedChanges = hasUnsavedChanges.value;
+
+      // Retain response state per tab
+      session.responseStatus = responseStatus.value;
+      session.responseTime = responseTime.value;
+      session.responseSize = responseSize.value;
+      session.responseData = responseData.value;
+    }
+  }
+
+  void _syncCurrentResponseToSession() {
+    final reqId = currentRequestId.value;
+    if (reqId != null && tabSessions.containsKey(reqId)) {
+      final session = tabSessions[reqId]!;
+      session.responseStatus = responseStatus.value;
+      session.responseTime = responseTime.value;
+      session.responseSize = responseSize.value;
+      session.responseData = responseData.value;
     }
   }
 
@@ -434,12 +501,20 @@ class RequestBuilderController extends GetxController {
     Map<String, dynamic> request, {
     String path = 'Workspace > Collection',
   }) {
+    final newId = request['_id'];
+    if (newId == null) return;
+
+    // Save previous active tab state before switching
+    if (currentRequestId.value != null && currentRequestId.value != newId) {
+      _saveCurrentTabState();
+    }
+
     _isParsingUrl = true; // prevent sync during load
 
-    currentRequestId.value = request['_id'];
+    currentRequestId.value = newId;
     currentPath.value = path;
 
-    bool exists = openRequests.any((req) => req['_id'] == request['_id']);
+    bool exists = openRequests.any((req) => req['_id'] == newId);
     if (!exists) {
       openRequests.add(Map<String, dynamic>.from(request));
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -453,10 +528,23 @@ class RequestBuilderController extends GetxController {
       });
     }
 
-    _finishLoadRequest(request);
+    RequestTabSession session;
+    if (tabSessions.containsKey(newId)) {
+      session = tabSessions[newId]!;
+      if (request['name'] != null) session.name = request['name'];
+      session.path = path;
+    } else {
+      session = RequestTabSession.fromRequest(request, path: path);
+      tabSessions[newId] = session;
+    }
+
+    _applyTabSession(session);
   }
 
   void updateOpenRequestName(String reqId, String newName) {
+    if (tabSessions.containsKey(reqId)) {
+      tabSessions[reqId]!.name = newName;
+    }
     for (var i = 0; i < openRequests.length; i++) {
       if (openRequests[i]['_id'] == reqId) {
         openRequests[i]['name'] = newName;
@@ -466,42 +554,127 @@ class RequestBuilderController extends GetxController {
     }
   }
 
-  void closeOtherRequests(String id) {
-    openRequests.removeWhere((req) => req['_id'] != id);
-    if (currentRequestId.value != id && openRequests.isNotEmpty) {
-      final req = openRequests.first;
-      loadRequest(req, path: 'Recent > ${req['name']}');
+  Future<bool> closeRequestTab(String id, {BuildContext? context}) async {
+    final unsaved = isTabUnsaved(id);
+    if (unsaved) {
+      final req = openRequests.firstWhereOrNull((r) => r['_id'] == id);
+      final reqName = req?['name'] ?? tabSessions[id]?.name ?? 'Unnamed';
+
+      final ctx = context ?? Get.context;
+      if (ctx == null) return false;
+
+      final action = await UnsavedChangesDialog.show(ctx, reqName);
+      if (action == null || action == UnsavedChangesAction.cancel) {
+        return false;
+      }
+
+      if (action == UnsavedChangesAction.save) {
+        if (id == currentRequestId.value) {
+          await saveChanges();
+        } else {
+          await _saveTabSessionById(id);
+        }
+      }
+    }
+
+    openRequests.removeWhere((r) => r['_id'] == id);
+    tabSessions.remove(id);
+
+    if (currentRequestId.value == id) {
+      if (openRequests.isNotEmpty) {
+        final nextReq = openRequests.last;
+        loadRequest(nextReq, path: 'Recent > ${nextReq['name']}');
+      } else {
+        currentRequestId.value = null;
+      }
+    }
+    return true;
+  }
+
+  Future<void> _saveTabSessionById(String id) async {
+    final session = tabSessions[id];
+    if (session == null) return;
+    try {
+      final cleanQueryParams = session.queryParams
+          .where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true)
+          .toList();
+      final cleanHeaders = session.headers
+          .where((h) => h['key']?.toString().isNotEmpty == true || h['value']?.toString().isNotEmpty == true || h['description']?.toString().isNotEmpty == true)
+          .toList();
+      final cleanFormData = session.formData
+          .where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true)
+          .toList();
+      final cleanUrlEncodedData = session.urlEncodedData
+          .where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true)
+          .toList();
+      final cleanSocketEvents = session.socketEvents
+          .where((p) => p['enabled'] == true && (p['key']?.toString().isNotEmpty ?? false))
+          .map((p) => p['key'].toString())
+          .toList();
+
+      final bodyPayload = {
+        'raw': session.body,
+        'formData': cleanFormData,
+        'urlEncodedData': cleanUrlEncodedData,
+      };
+
+      final updateData = {
+        'url': session.url,
+        'method': session.method,
+        'docs': session.docs,
+        'authType': session.authType,
+        'authConfig': session.authConfig,
+        'headers': cleanHeaders,
+        'queryParams': cleanQueryParams,
+        'bodyType': session.bodyType == 'x-www-form-urlencoded' ? 'urlencoded' : session.bodyType,
+        'bodyFormat': session.bodyFormat,
+        'body': bodyPayload,
+        'socketConfig': {...session.socketConfig, 'events': cleanSocketEvents},
+      };
+
+      await _apiService.updateRequest(id, updateData);
+      session.hasUnsavedChanges = false;
+      Get.find<WorkspaceController>().fetchCollections();
+    } catch (e) {
+      log('Failed to save tab $id', error: e, name: 'RequestBuilderController');
     }
   }
 
-  void closeRequestsToRight(String id) {
+  Future<void> closeOtherRequests(String id, {BuildContext? context}) async {
+    final otherIds = openRequests
+        .where((req) => req['_id'] != id)
+        .map((req) => req['_id']?.toString() ?? '')
+        .toList();
+    for (final otherId in otherIds) {
+      final closed = await closeRequestTab(otherId, context: context);
+      if (!closed) break;
+    }
+  }
+
+  Future<void> closeRequestsToRight(String id, {BuildContext? context}) async {
     int idx = openRequests.indexWhere((req) => req['_id'] == id);
     if (idx != -1 && idx < openRequests.length - 1) {
-      final toRemove = openRequests.sublist(idx + 1).map((r) => r['_id']).toSet();
-      openRequests.removeRange(idx + 1, openRequests.length);
-      if (toRemove.contains(currentRequestId.value)) {
-        if (openRequests.isNotEmpty) {
-          final req = openRequests.last;
-          loadRequest(req, path: 'Recent > ${req['name']}');
-        } else {
-          currentRequestId.value = null;
-        }
+      final rightIds = openRequests
+          .sublist(idx + 1)
+          .map((req) => req['_id']?.toString() ?? '')
+          .toList();
+      for (final rId in rightIds) {
+        final closed = await closeRequestTab(rId, context: context);
+        if (!closed) break;
       }
     }
   }
 
-  void closeRequestsToLeft(String id) {
+  Future<void> closeRequestsToLeft(String id, {BuildContext? context}) async {
     int idx = openRequests.indexWhere((req) => req['_id'] == id);
     if (idx > 0) {
-      final toRemove = openRequests.sublist(0, idx).map((r) => r['_id']).toSet();
-      openRequests.removeRange(0, idx);
-      if (toRemove.contains(currentRequestId.value)) {
-        if (openRequests.isNotEmpty) {
-          final req = openRequests.first;
-          loadRequest(req, path: 'Recent > ${req['name']}');
-        } else {
-          currentRequestId.value = null;
-        }
+      final leftIds = openRequests
+          .sublist(0, idx)
+          .map((req) => req['_id']?.toString() ?? '')
+          .toList();
+      for (final lId in leftIds) {
+        final closed = await closeRequestTab(lId, context: context);
+        if (!closed) break;
       }
     }
   }
@@ -514,119 +687,48 @@ class RequestBuilderController extends GetxController {
     openRequests.insert(newIndex, req);
   }
 
-  void _finishLoadRequest(Map<String, dynamic> request) {
+  void _applyTabSession(RequestTabSession session) {
+    originalRequestKind = session.originalRequestKind;
+    originalMethod = session.originalMethod;
+    originalUrl = session.originalUrl;
+    originalDocs = session.originalDocs;
+    originalAuthType = session.originalAuthType;
+    originalAuthConfig = Map<String, dynamic>.from(session.originalAuthConfig);
+    originalHeaders = List<Map<String, dynamic>>.from(session.originalHeaders);
+    originalQueryParams = List<Map<String, dynamic>>.from(session.originalQueryParams);
+    originalBodyType = session.originalBodyType;
+    originalBodyFormat = session.originalBodyFormat;
+    originalBody = session.originalBody;
+    originalFormData = List<Map<String, dynamic>>.from(session.originalFormData);
+    originalUrlEncodedData = List<Map<String, dynamic>>.from(session.originalUrlEncodedData);
+    originalSocketConfig = Map<String, dynamic>.from(session.originalSocketConfig);
+    originalSocketEvents = List<Map<String, dynamic>>.from(session.originalSocketEvents);
 
-    originalRequestKind = request['requestKind'] ?? 'http';
-    originalMethod = request['method'] ?? 'GET';
-    originalUrl = request['url'] ?? '';
-    originalDocs = request['docs'] ?? '';
-    originalAuthType = request['authType'] ?? 'inherit';
-    originalAuthConfig = request['authConfig'] ?? <String, dynamic>{};
-    originalHeaders = List<Map<String, dynamic>>.from(request['headers'] ?? []);
-    originalQueryParams = List<Map<String, dynamic>>.from(
-      request['queryParams'] ?? [],
-    );
-    originalBodyType = request['bodyType'] ?? 'none';
-    originalBodyFormat =
-        (request['bodyFormat'] ?? 'json').toString().toLowerCase();
-    originalBody = request['body'] ?? '';
-    originalSocketConfig = request['socketConfig'] ?? <String, dynamic>{};
+    requestKind.value = session.requestKind;
+    method.value = session.method;
+    url.value = session.url;
+    urlController.text = session.url;
+    docs.value = session.docs;
+    authType.value = session.authType;
+    authConfig.value = Map<String, dynamic>.from(session.authConfig);
+    headers.value = List<Map<String, dynamic>>.from(session.headers);
+    queryParams.value = List<Map<String, dynamic>>.from(session.queryParams);
+    bodyType.value = session.bodyType;
+    bodyFormat.value = session.bodyFormat;
+    body.value = session.body;
+    formData.assignAll(session.formData);
+    urlEncodedData.assignAll(session.urlEncodedData);
+    socketConfig.value = Map<String, dynamic>.from(session.socketConfig);
+    socketEvents.value = List<Map<String, dynamic>>.from(session.socketEvents);
 
-    if (originalSocketConfig['events'] is List) {
-      originalSocketEvents = (originalSocketConfig['events'] as List)
-          .map(
-            (e) => {
-              'key': e.toString(),
-              'value': '',
-              'description': '',
-              'enabled': true,
-            },
-          )
-          .toList();
-    } else {
-      originalSocketEvents = [];
-    }
-
-    requestKind.value = originalRequestKind;
-    method.value = originalMethod;
-    url.value = originalUrl;
-    urlController.text = originalUrl;
-    docs.value = originalDocs;
-    authType.value = originalAuthType;
-    authConfig.value = Map<String, dynamic>.from(originalAuthConfig);
-    headers.value = List<Map<String, dynamic>>.from(originalHeaders);
-    queryParams.value = List<Map<String, dynamic>>.from(originalQueryParams);
-    bodyType.value = originalBodyType;
-    bodyFormat.value = originalBodyFormat;
-
-    if (originalBody is Map && originalBody.containsKey('raw')) {
-      body.value = originalBody['raw'] ?? '';
-
-      if (originalBody['formData'] is List) {
-        originalFormData = List<Map<String, dynamic>>.from(
-          originalBody['formData'].map((e) => Map<String, dynamic>.from(e)),
-        );
-      } else {
-        originalFormData = [];
-      }
-      formData.assignAll(originalFormData);
-
-      if (originalBody['urlEncodedData'] is List) {
-        originalUrlEncodedData = List<Map<String, dynamic>>.from(
-          originalBody['urlEncodedData'].map(
-            (e) => Map<String, dynamic>.from(e),
-          ),
-        );
-      } else {
-        originalUrlEncodedData = [];
-      }
-      urlEncodedData.assignAll(originalUrlEncodedData);
-    } else {
-      if (originalBodyType == 'form-data') {
-        if (originalBody is List) {
-          originalFormData = List<Map<String, dynamic>>.from(
-            originalBody.map((e) => Map<String, dynamic>.from(e)),
-          );
-        } else {
-          originalFormData = [];
-        }
-        formData.assignAll(originalFormData);
-        urlEncodedData.clear();
-        body.value = '';
-      } else if (originalBodyType == 'urlencoded' ||
-          originalBodyType == 'x-www-form-urlencoded') {
-        if (originalBody is List) {
-          originalUrlEncodedData = List<Map<String, dynamic>>.from(
-            originalBody.map((e) => Map<String, dynamic>.from(e)),
-          );
-        } else {
-          originalUrlEncodedData = [];
-        }
-        urlEncodedData.assignAll(originalUrlEncodedData);
-        formData.clear();
-        body.value = '';
-      } else {
-        body.value = originalBody;
-        formData.clear();
-        urlEncodedData.clear();
-        originalFormData = [];
-        originalUrlEncodedData = [];
-      }
-    }
-
-    socketConfig.value = Map<String, dynamic>.from(originalSocketConfig);
-    socketEvents.value = List<Map<String, dynamic>>.from(
-      originalSocketEvents.map((e) => Map<String, dynamic>.from(e)),
-    );
-
-    hasUnsavedChanges.value = false;
+    hasUnsavedChanges.value = session.hasUnsavedChanges;
     _isParsingUrl = false;
 
-    // Clear response pane
-    responseStatus.value = 0;
-    responseData.value = '';
-    responseTime.value = 0;
-    responseSize.value = 0;
+    // Restore cached response pane for this tab
+    responseStatus.value = session.responseStatus;
+    responseData.value = session.responseData;
+    responseTime.value = session.responseTime;
+    responseSize.value = session.responseSize;
   }
 
   void loadSavedResponse(
@@ -639,6 +741,7 @@ class RequestBuilderController extends GetxController {
     responseData.value = response['data'] ?? '';
     responseTime.value = response['time'] ?? 0;
     responseSize.value = response['size'] ?? 0;
+    _syncCurrentResponseToSession();
   }
 
   Future<void> saveChanges({bool isAutoSave = false}) async {
@@ -731,6 +834,33 @@ class RequestBuilderController extends GetxController {
 
       hasUnsavedChanges.value = false;
 
+      if (currentRequestId.value != null && tabSessions.containsKey(currentRequestId.value)) {
+        final session = tabSessions[currentRequestId.value]!;
+        session.hasUnsavedChanges = false;
+        session.originalUrl = url.value;
+        session.originalMethod = method.value;
+        session.originalDocs = docs.value;
+        session.originalAuthType = authType.value;
+        session.originalAuthConfig = Map<String, dynamic>.from(authConfig);
+        session.originalHeaders = List<Map<String, dynamic>>.from(headers);
+        session.originalQueryParams = List<Map<String, dynamic>>.from(queryParams);
+        session.originalBodyType = bodyType.value;
+        session.originalBodyFormat = bodyFormat.value;
+        session.originalBody = bodyPayload;
+        session.originalFormData = List<Map<String, dynamic>>.from(formData);
+        session.originalUrlEncodedData = List<Map<String, dynamic>>.from(urlEncodedData);
+        session.originalSocketConfig = Map<String, dynamic>.from(socketConfig);
+        session.originalSocketEvents = List<Map<String, dynamic>>.from(socketEvents);
+      }
+      for (var req in openRequests) {
+        if (req['_id'] == currentRequestId.value) {
+          req['isUnsaved'] = false;
+          req['method'] = method.value;
+          openRequests.refresh();
+          break;
+        }
+      }
+
       if (!isAutoSave) {
         Get.find<WorkspaceController>().fetchCollections();
       } else {
@@ -761,10 +891,6 @@ class RequestBuilderController extends GetxController {
         isError: true,
       );
       return;
-    }
-
-    if (hasUnsavedChanges.value) {
-      await saveChanges();
     }
 
     isLoading.value = true;
@@ -1149,6 +1275,7 @@ class RequestBuilderController extends GetxController {
         isError: true,
       );
     } finally {
+      _syncCurrentResponseToSession();
       isLoading.value = false;
     }
   }

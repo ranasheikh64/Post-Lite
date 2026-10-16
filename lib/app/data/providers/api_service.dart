@@ -5,48 +5,28 @@ class ApiService {
 
   // --- Workspaces ---
 
-  Future<List<dynamic>> getWorkspaces() async {
-    final response = await _network.getRequest('/workspaces');
-    return response.data;
-  }
-
-  Future<Map<String, dynamic>> createWorkspace(String name) async {
-    final response = await _network.postRequest('/workspaces', data: {'name': name});
-    return response.data;
-  }
-
-  Future<void> deleteWorkspace(String id) async {
-    await _network.deleteRequest('/workspaces/$id');
-  }
+  Future<List<dynamic>> getWorkspaces() async => (await _network.getRequest('/workspaces')).data;
+  Future<Map<String, dynamic>> createWorkspace(String name) async => (await _network.postRequest('/workspaces', data: {'name': name})).data;
+  Future<void> deleteWorkspace(String id) async => await _network.deleteRequest('/workspaces/$id');
 
   Future<Map<String, dynamic>> inviteMember(String workspaceId, String email, String role) async {
-    final response = await _network.postRequest('/workspaces/$workspaceId/invite', data: {
-      'email': email,
-      'role': role,
-    });
+    final response = await _network.postRequest('/workspaces/$workspaceId/invite', data: {'email': email, 'role': role});
     return response.data;
   }
 
   Future<Map<String, dynamic>> acceptWorkspaceInvite(String token) async {
-    final response = await _network.postRequest('/workspaces/invite/$token/accept', data: {
-      'token': token,
-    });
+    final response = await _network.postRequest('/workspaces/invite/$token/accept', data: {'token': token});
     return response.data;
   }
 
-  Future<Map<String, dynamic>> addWorkspaceMember(String workspaceId, String email, String role) async {
-    final response = await _network.postRequest('/workspaces/$workspaceId/members', data: {'email': email, 'role': role});
-    return response.data;
-  }
+  Future<Map<String, dynamic>> addWorkspaceMember(String workspaceId, String email, String role) async =>
+      (await _network.postRequest('/workspaces/$workspaceId/members', data: {'email': email, 'role': role})).data;
 
-  Future<Map<String, dynamic>> updateWorkspaceMemberRole(String workspaceId, String userId, String role) async {
-    final response = await _network.patchRequest('/workspaces/$workspaceId/members/$userId', data: {'role': role});
-    return response.data;
-  }
+  Future<Map<String, dynamic>> updateWorkspaceMemberRole(String workspaceId, String userId, String role) async =>
+      (await _network.patchRequest('/workspaces/$workspaceId/members/$userId', data: {'role': role})).data;
 
-  Future<void> removeWorkspaceMember(String workspaceId, String userId) async {
-    await _network.deleteRequest('/workspaces/$workspaceId/members/$userId');
-  }
+  Future<void> removeWorkspaceMember(String workspaceId, String userId) async =>
+      await _network.deleteRequest('/workspaces/$workspaceId/members/$userId');
 
   Future<Map<String, dynamic>> searchWorkspace(String workspaceId, String query) async {
     final response = await _network.getRequest('/workspaces/$workspaceId/search', queryParameters: {'q': query});
@@ -132,6 +112,18 @@ class ApiService {
     await _network.patchRequest('/requests/reorder', data: {'requestIds': requestIds});
   }
 
+  Future<void> reorderCollections(List<String> collectionIds) async {
+    try {
+      await _network.patchRequest('/collections/reorder', data: {'collectionIds': collectionIds});
+    } catch (_) {
+      for (int i = 0; i < collectionIds.length; i++) {
+        try {
+          await _network.patchRequest('/collections/${collectionIds[i]}', data: {'sortOrder': i});
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<Map<String, dynamic>> saveResponse(String requestId, Map<String, dynamic> responseData) async {
     final response = await _network.postRequest('/requests/$requestId/responses', data: responseData);
     return response.data;
@@ -139,5 +131,13 @@ class ApiService {
 
   Future<void> deleteSavedResponse(String requestId, String responseId) async {
     await _network.deleteRequest('/requests/$requestId/responses/$responseId');
+  }
+
+  Future<Map<String, dynamic>?> getLatestUpdate() async {
+    try {
+      return (await _network.getRequest('/updates/latest')).data as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
   }
 }
