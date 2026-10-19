@@ -7,12 +7,14 @@ import 'package:postmanclone/app/data/providers/network_caller.dart';
 import 'dart:developer';
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io' as io;
 
 import 'package:postmanclone/app/modules/home/controllers/workspace_controller.dart';
 import 'package:postmanclone/app/widgets/variable_hover_card.dart';
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 import 'package:postmanclone/app/data/models/request_tab_session.dart';
 import 'package:postmanclone/app/modules/request_builder/widgets/unsaved_changes_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class VariableTextEditingController extends TextEditingController {
   final RequestBuilderController reqController;
@@ -192,16 +194,56 @@ class RequestBuilderController extends GetxController {
 
   @override
   void onClose() {
+    _autoSaveDebounceTimer?.cancel();
     tabsScrollController.dispose();
     super.onClose();
   }
 
   var topPanelHeight = 300.0.obs;
   bool _isParsingUrl = false;
+  var autoSaveEnabled = false.obs;
+  var isSaving = false.obs;
+  Timer? _autoSaveDebounceTimer;
+
+  Future<void> _loadAutoSavePref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      autoSaveEnabled.value = prefs.getBool('auto_save_tabs') ?? false;
+    } catch (_) {}
+  }
+
+  Future<void> toggleAutoSave([bool? value]) async {
+    autoSaveEnabled.value = value ?? !autoSaveEnabled.value;
+    if (!autoSaveEnabled.value) {
+      _autoSaveDebounceTimer?.cancel();
+    } else if (hasUnsavedChanges.value && currentRequestId.value != null) {
+      _triggerAutoSaveDebounced();
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('auto_save_tabs', autoSaveEnabled.value);
+    } catch (_) {}
+    CustomSnackbar.show(
+      title: autoSaveEnabled.value ? 'Auto Save Enabled' : 'Auto Save Disabled',
+      message: autoSaveEnabled.value
+          ? 'Changes will automatically save to cloud for your team.'
+          : 'Closing unsaved tabs will prompt for confirmation.',
+    );
+  }
+
+  void _triggerAutoSaveDebounced() {
+    _autoSaveDebounceTimer?.cancel();
+    _autoSaveDebounceTimer = Timer(const Duration(milliseconds: 1200), () async {
+      if (autoSaveEnabled.value && hasUnsavedChanges.value && currentRequestId.value != null && !isSaving.value) {
+        await saveChanges(isAutoSave: true);
+      }
+    });
+  }
 
   @override
   void onInit() {
     super.onInit();
+    _loadAutoSavePref();
 
     urlController.addListener(() {
       if (_isParsingUrl) return;
@@ -401,6 +443,21 @@ class RequestBuilderController extends GetxController {
                   p['value']?.toString().isNotEmpty == true ||
                   p['description']?.toString().isNotEmpty == true,
             )
+            .map((p) => <String, dynamic>{
+                  'key': p['key'],
+                  'type': p['type'],
+                  'value': p['value'],
+                  'description': p['description'],
+                  'enabled': p['enabled'],
+                  if (p['files'] != null)
+                    'files': (p['files'] as List)
+                        .map((f) => {
+                              'name': f['name'],
+                              'path': f['path'],
+                              'size': f['size'],
+                            })
+                        .toList(),
+                })
             .toList(),
         'urlEncodedData': urlEncodedData
             .where(
@@ -432,6 +489,10 @@ class RequestBuilderController extends GetxController {
           break;
         }
       }
+    }
+
+    if (changed && autoSaveEnabled.value) {
+      _triggerAutoSaveDebounced();
     }
   }
 
@@ -506,6 +567,10 @@ class RequestBuilderController extends GetxController {
 
     // Save previous active tab state before switching
     if (currentRequestId.value != null && currentRequestId.value != newId) {
+      _autoSaveDebounceTimer?.cancel();
+      if (autoSaveEnabled.value && hasUnsavedChanges.value) {
+        saveChanges(isAutoSave: true);
+      }
       _saveCurrentTabState();
     }
 
@@ -557,22 +622,35 @@ class RequestBuilderController extends GetxController {
   Future<bool> closeRequestTab(String id, {BuildContext? context}) async {
     final unsaved = isTabUnsaved(id);
     if (unsaved) {
-      final req = openRequests.firstWhereOrNull((r) => r['_id'] == id);
-      final reqName = req?['name'] ?? tabSessions[id]?.name ?? 'Unnamed';
-
-      final ctx = context ?? Get.context;
-      if (ctx == null) return false;
-
-      final action = await UnsavedChangesDialog.show(ctx, reqName);
-      if (action == null || action == UnsavedChangesAction.cancel) {
-        return false;
-      }
-
-      if (action == UnsavedChangesAction.save) {
+      if (autoSaveEnabled.value) {
         if (id == currentRequestId.value) {
-          await saveChanges();
+          await saveChanges(isAutoSave: true);
         } else {
           await _saveTabSessionById(id);
+        }
+      } else {
+        final req = openRequests.firstWhereOrNull((r) => r['_id'] == id);
+        final reqName = req?['name'] ?? tabSessions[id]?.name ?? 'Unnamed';
+
+        final ctx = context ?? Get.context;
+        if (ctx == null) return false;
+
+        final action = await UnsavedChangesDialog.show(
+          ctx,
+          reqName,
+          autoSaveEnabled: autoSaveEnabled.value,
+          onAutoSaveToggled: (val) => toggleAutoSave(val),
+        );
+        if (action == null || action == UnsavedChangesAction.cancel) {
+          return false;
+        }
+
+        if (action == UnsavedChangesAction.save) {
+          if (id == currentRequestId.value) {
+            await saveChanges();
+          } else {
+            await _saveTabSessionById(id);
+          }
         }
       }
     }
@@ -603,6 +681,21 @@ class RequestBuilderController extends GetxController {
           .toList();
       final cleanFormData = session.formData
           .where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true)
+          .map((p) => <String, dynamic>{
+                'key': p['key'],
+                'type': p['type'] ?? 'text',
+                'value': p['value'],
+                'description': p['description'],
+                'enabled': p['enabled'] ?? true,
+                if (p['files'] != null)
+                  'files': (p['files'] as List)
+                      .map((f) => {
+                            'name': f['name']?.toString() ?? '',
+                            'path': f['path']?.toString() ?? '',
+                            'size': f['size'] ?? 0,
+                          })
+                      .toList(),
+              })
           .toList();
       final cleanUrlEncodedData = session.urlEncodedData
           .where((p) => p['key']?.toString().isNotEmpty == true || p['value']?.toString().isNotEmpty == true || p['description']?.toString().isNotEmpty == true)
@@ -745,7 +838,9 @@ class RequestBuilderController extends GetxController {
   }
 
   Future<void> saveChanges({bool isAutoSave = false}) async {
-    if (currentRequestId.value == null) return;
+    if (currentRequestId.value == null || isSaving.value) return;
+    isSaving.value = true;
+    _autoSaveDebounceTimer?.cancel();
 
     try {
       final cleanQueryParams = queryParams
@@ -772,6 +867,21 @@ class RequestBuilderController extends GetxController {
                 p['value']?.toString().isNotEmpty == true ||
                 p['description']?.toString().isNotEmpty == true,
           )
+          .map((p) => <String, dynamic>{
+                'key': p['key'],
+                'type': p['type'] ?? 'text',
+                'value': p['value'],
+                'description': p['description'],
+                'enabled': p['enabled'] ?? true,
+                if (p['files'] != null)
+                  'files': (p['files'] as List)
+                      .map((f) => {
+                            'name': f['name']?.toString() ?? '',
+                            'path': f['path']?.toString() ?? '',
+                            'size': f['size'] ?? 0,
+                          })
+                      .toList(),
+              })
           .toList();
       final cleanUrlEncodedData = urlEncodedData
           .where(
@@ -880,6 +990,8 @@ class RequestBuilderController extends GetxController {
           isError: true,
         );
       }
+    } finally {
+      isSaving.value = false;
     }
   }
 
@@ -1040,16 +1152,67 @@ class RequestBuilderController extends GetxController {
           if (item['enabled'] == true &&
               item['key']?.toString().isNotEmpty == true) {
             final key = resolveVariables(item['key']);
-            if (item['type'] == 'file' &&
-                item['value']?.toString().isNotEmpty == true) {
-              final filePath = resolveVariables(item['value']);
-              final fileName = filePath.split('/').last;
-              fd.files.add(
-                MapEntry(
-                  key,
-                  await MultipartFile.fromFile(filePath, filename: fileName),
-                ),
-              );
+            if (item['type'] == 'file') {
+              final filesList = item['files'] as List?;
+              if (filesList != null && filesList.isNotEmpty) {
+                for (var fileInfo in filesList) {
+                  final name = fileInfo['name']?.toString() ?? 'file';
+                  final bytes = fileInfo['bytes'] as Uint8List?;
+                  final path = fileInfo['path']?.toString();
+                  if (bytes != null && bytes.isNotEmpty) {
+                    fd.files.add(
+                      MapEntry(
+                        key,
+                        MultipartFile.fromBytes(bytes, filename: name),
+                      ),
+                    );
+                  } else if (path != null && path.isNotEmpty) {
+                    if (!kIsWeb && io.File(path).existsSync()) {
+                      fd.files.add(
+                        MapEntry(
+                          key,
+                          await MultipartFile.fromFile(path, filename: name),
+                        ),
+                      );
+                    } else {
+                      throw Exception(
+                        "File '$name' was not found on your system (path: $path). Please click the file cell and select the file again.",
+                      );
+                    }
+                  } else {
+                    throw Exception(
+                      "File '$name' has no file content. Please click the file cell and select the file again.",
+                    );
+                  }
+                }
+              } else if (item['value']?.toString().isNotEmpty == true) {
+                final rawVal = resolveVariables(item['value']);
+                if (rawVal.contains(' files (') || RegExp(r'^\d+\s+files?\s*\(').hasMatch(rawVal)) {
+                  throw Exception(
+                    "The selected files for '$key' are not loaded in memory. Please click on the file cell to select the files before sending.",
+                  );
+                }
+                final paths = rawVal.split(RegExp(r'[,|]')).map((s) => s.trim()).where((s) => s.isNotEmpty);
+                for (var p in paths) {
+                  if (!kIsWeb && io.File(p).existsSync()) {
+                    final fileName = p.split(RegExp(r'[/\\]')).last;
+                    fd.files.add(
+                      MapEntry(
+                        key,
+                        await MultipartFile.fromFile(p, filename: fileName),
+                      ),
+                    );
+                  } else {
+                    throw Exception(
+                      "File not found at '$p'. Please re-select the file in Form Data.",
+                    );
+                  }
+                }
+              } else {
+                throw Exception(
+                  "No file selected for '$key'. Please select a file before sending.",
+                );
+              }
             } else {
               fd.fields.add(
                 MapEntry(key, resolveVariables(item['value'] ?? '')),

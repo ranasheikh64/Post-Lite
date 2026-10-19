@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../controllers/request_builder_controller.dart';
 import 'code_snippet_dialog.dart';
 import 'request_tabs_list.dart';
+import 'top_bar_auto_save_chip.dart';
+import 'top_bar_tab_scroll_buttons.dart';
 
 class RequestTopBar extends StatelessWidget {
   const RequestTopBar({super.key});
@@ -19,48 +21,8 @@ class RequestTopBar extends StatelessWidget {
           const Expanded(child: RequestTabsList()),
           Row(
             children: [
-              Obx(() {
-                if (controller.openRequests.length <= 1) {
-                  return const SizedBox.shrink();
-                }
-                return Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF222533),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Tooltip(
-                        message: 'Scroll tabs left',
-                        child: InkWell(
-                          onTap: controller.scrollTabsLeft,
-                          borderRadius: const BorderRadius.horizontal(left: Radius.circular(5)),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            child: Icon(Icons.arrow_back_ios_new_rounded, size: 13, color: Colors.white70),
-                          ),
-                        ),
-                      ),
-                      Container(width: 1, height: 16, color: Colors.white12),
-                      Tooltip(
-                        message: 'Scroll tabs right',
-                        child: InkWell(
-                          onTap: controller.scrollTabsRight,
-                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(5)),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            child: Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Colors.white70),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+              const TopBarTabScrollButtons(),
+              const TopBarAutoSaveChip(),
               OutlinedButton.icon(
                 onPressed: () => controller.saveChanges(),
                 icon: const Icon(Icons.save, size: 16),

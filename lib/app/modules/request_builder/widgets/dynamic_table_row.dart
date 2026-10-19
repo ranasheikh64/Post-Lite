@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'form_data_file_cell.dart';
-import 'table_field_autocomplete.dart';
+import 'dynamic_table_key_cell.dart';
+import 'dynamic_table_val_cell.dart';
 
 class DynamicTableRow extends StatefulWidget {
   final String title;
@@ -9,6 +9,8 @@ class DynamicTableRow extends StatefulWidget {
   final bool isLast;
   final ValueChanged<bool> onEnabledChanged;
   final ValueChanged<String> onKeyChanged, onValChanged, onDescChanged;
+  final ValueChanged<String>? onTypeChanged;
+  final void Function(List<Map<String, dynamic>> files, String displayValue)? onFilesChanged;
   final VoidCallback onDelete;
 
   const DynamicTableRow({
@@ -21,6 +23,8 @@ class DynamicTableRow extends StatefulWidget {
     required this.onKeyChanged,
     required this.onValChanged,
     required this.onDescChanged,
+    this.onTypeChanged,
+    this.onFilesChanged,
     required this.onDelete,
   });
 
@@ -31,20 +35,12 @@ class DynamicTableRow extends StatefulWidget {
 class _DynamicTableRowState extends State<DynamicTableRow> {
   bool _isHovered = false;
 
-  static const _baseDec = InputDecoration(
-    filled: false,
-    border: InputBorder.none,
-    enabledBorder: InputBorder.none,
-    focusedBorder: InputBorder.none,
-    isDense: true,
-    contentPadding: EdgeInsets.symmetric(vertical: 8),
-  );
-
   @override
   Widget build(BuildContext context) {
     final keyVal = widget.item['key']?.toString() ?? '';
     final valVal = widget.item['value']?.toString() ?? '';
     final descVal = widget.item['description']?.toString() ?? '';
+    final currentType = widget.item['type']?.toString() ?? 'text';
     final isEnabled = widget.item['enabled'] ?? true;
     final hasContent = keyVal.isNotEmpty || valVal.isNotEmpty || descVal.isNotEmpty;
     final uid = widget.item['id'] ?? widget.index.toString();
@@ -82,14 +78,14 @@ class _DynamicTableRowState extends State<DynamicTableRow> {
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.only(left: 10.0),
-                child: TableFieldAutocomplete(
-                  key: ValueKey('${widget.title}_key_$uid'),
+                child: DynamicTableKeyCell(
                   title: widget.title,
-                  isKey: true,
-                  initialValue: keyVal,
-                  onChanged: widget.onKeyChanged,
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: hasContent ? const Color(0xFF9CDCFE) : const Color(0xFFD4D4D4)),
-                  decoration: _baseDec.copyWith(hintText: 'Key', hintStyle: const TextStyle(color: Color(0xFF4E536E), fontSize: 12.5, fontFamily: 'monospace')),
+                  uid: uid,
+                  keyVal: keyVal,
+                  hasContent: hasContent,
+                  currentType: currentType,
+                  onKeyChanged: widget.onKeyChanged,
+                  onTypeChanged: widget.onTypeChanged,
                 ),
               ),
             ),
@@ -98,18 +94,16 @@ class _DynamicTableRowState extends State<DynamicTableRow> {
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.only(left: 10.0),
-                child: (widget.title == 'Form Data' && widget.item['type'] == 'file')
-                    ? FormDataFileCell(filePath: valVal, onFileSelected: widget.onValChanged)
-                    : TableFieldAutocomplete(
-                        key: ValueKey('${widget.title}_val_$uid'),
-                        title: widget.title,
-                        isKey: false,
-                        headerKey: keyVal,
-                        initialValue: valVal,
-                        onChanged: widget.onValChanged,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Color(0xFFCE9178)),
-                        decoration: _baseDec.copyWith(hintText: 'Value', hintStyle: const TextStyle(color: Color(0xFF4E536E), fontSize: 12.5, fontFamily: 'monospace')),
-                      ),
+                child: DynamicTableValCell(
+                  title: widget.title,
+                  uid: uid,
+                  keyVal: keyVal,
+                  valVal: valVal,
+                  currentType: currentType,
+                  files: widget.item['files'] as List?,
+                  onValChanged: widget.onValChanged,
+                  onFilesChanged: widget.onFilesChanged,
+                ),
               ),
             ),
             const VerticalDivider(width: 1, thickness: 1, indent: 9, endIndent: 9, color: Color(0xFF222638)),
@@ -122,7 +116,14 @@ class _DynamicTableRowState extends State<DynamicTableRow> {
                   initialValue: descVal,
                   onChanged: widget.onDescChanged,
                   style: const TextStyle(fontSize: 12.5, color: Color(0xFFCBD5E1)),
-                  decoration: _baseDec.copyWith(hintText: 'Description', hintStyle: const TextStyle(color: Color(0xFF4E536E), fontSize: 12.5)),
+                  decoration: const InputDecoration(
+                    filled: false,
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    hintText: 'Description',
+                    hintStyle: TextStyle(color: Color(0xFF4E536E), fontSize: 12.5),
+                  ),
                 ),
               ),
             ),

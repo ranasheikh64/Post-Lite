@@ -62,6 +62,14 @@ class DynamicTableView extends StatelessWidget {
                             onKeyChanged: (val) => _updateItem(idx, 'key', val),
                             onValChanged: (val) => _updateItem(idx, 'value', val),
                             onDescChanged: (val) => _updateItem(idx, 'description', val),
+                            onTypeChanged: (val) => _updateItem(idx, 'type', val),
+                            onFilesChanged: (files, displayVal) {
+                              final list = List<Map<String, dynamic>>.from(items);
+                              list[idx]['files'] = files;
+                              list[idx]['value'] = displayVal;
+                              items.value = list;
+                              onChanged();
+                            },
                             onDelete: () {
                               final list = List<Map<String, dynamic>>.from(items);
                               list.removeAt(idx);
@@ -93,6 +101,7 @@ class DynamicTableView extends StatelessWidget {
         items.add({
           'key': '',
           'value': '',
+          'type': 'text',
           'description': '',
           'enabled': true,
           'id': DateTime.now().millisecondsSinceEpoch.toString(),

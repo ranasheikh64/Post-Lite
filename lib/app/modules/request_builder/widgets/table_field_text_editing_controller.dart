@@ -8,6 +8,8 @@ class TableFieldTextEditingController extends TextEditingController {
 
   TableFieldTextEditingController({super.text, this.isKey = false});
 
+  String _clean(String s) => s.replaceAll('\n', ' ').replaceAll('\r', ' ');
+
   @override
   TextSpan buildTextSpan({
     required BuildContext context,
@@ -34,7 +36,7 @@ class TableFieldTextEditingController extends TextEditingController {
       if (authMatch != null) {
         spans.add(
           TextSpan(
-            text: text.substring(0, authMatch.end),
+            text: _clean(text.substring(0, authMatch.end)),
             style: (style ?? const TextStyle()).copyWith(
               color: const Color(0xFF569CD6),
               fontWeight: FontWeight.w600,
@@ -51,13 +53,13 @@ class TableFieldTextEditingController extends TextEditingController {
 
     for (final m in varRegex.allMatches(remaining)) {
       if (m.start > lastEnd) {
-        spans.add(TextSpan(text: remaining.substring(lastEnd, m.start), style: style));
+        spans.add(TextSpan(text: _clean(remaining.substring(lastEnd, m.start)), style: style));
       }
       final varName = m.group(1)!;
       final isResolved = variables.containsKey(varName);
       spans.add(
         TextSpan(
-          text: m.group(0),
+          text: _clean(m.group(0)!),
           style: (style ?? const TextStyle()).copyWith(
             color: isResolved ? const Color(0xFFFF9800) : Colors.redAccent,
             fontWeight: FontWeight.w600,
@@ -68,7 +70,7 @@ class TableFieldTextEditingController extends TextEditingController {
     }
 
     if (lastEnd < remaining.length) {
-      spans.add(TextSpan(text: remaining.substring(lastEnd), style: style));
+      spans.add(TextSpan(text: _clean(remaining.substring(lastEnd)), style: style));
     }
 
     return TextSpan(style: style, children: spans);

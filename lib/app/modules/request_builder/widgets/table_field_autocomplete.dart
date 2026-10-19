@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:postmanclone/app/data/providers/http_headers_provider.dart';
@@ -29,12 +30,14 @@ class TableFieldAutocomplete extends StatefulWidget {
 class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
     _controller = TableFieldTextEditingController(text: widget.initialValue, isKey: widget.isKey);
     _focusNode = FocusNode();
+    _scrollController = ScrollController();
   }
 
   @override
@@ -51,16 +54,15 @@ class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   Iterable<Object> _buildOptions(TextEditingValue textValue) {
-    final text = textValue.text;
-    final sel = textValue.selection;
+    final text = textValue.text, sel = textValue.selection;
     final cursor = sel.isValid ? sel.baseOffset : text.length;
     final before = text.substring(0, cursor);
-    final lastOpen = before.lastIndexOf('{{');
-    final lastClose = before.lastIndexOf('}}');
+    final lastOpen = before.lastIndexOf('{{'), lastClose = before.lastIndexOf('}}');
 
     if (lastOpen != -1 && lastOpen > lastClose) {
       final q = before.substring(lastOpen + 2).toLowerCase();
@@ -69,7 +71,6 @@ class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
       final vars = ws.getVariablesForRequest(reqCtrl.currentRequestId.value ?? '');
       return vars.entries.where((e) => e.key.toLowerCase().contains(q));
     }
-
     if (widget.title == 'Headers') {
       if (widget.isKey) return HttpHeadersProvider.searchHeaders(text);
       if (widget.headerKey?.isNotEmpty == true) return HttpHeadersProvider.searchValues(widget.headerKey!, text);
@@ -78,8 +79,7 @@ class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
   }
 
   void _selectOption(Object opt, AutocompleteOnSelected<Object> onSel) {
-    String newText;
-    int offset;
+    final String newText;
     if (opt is MapEntry) {
       final text = _controller.text, sel = _controller.selection;
       final cursor = sel.isValid ? sel.baseOffset : text.length;
@@ -88,16 +88,13 @@ class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
       if (after.startsWith('}')) after = after.substring(1);
       if (after.startsWith('}')) after = after.substring(1);
       final lastOpen = before.lastIndexOf('{{');
-      final newBefore = lastOpen != -1 ? '${before.substring(0, lastOpen)}{{${opt.key}}}' : '{{${opt.key}}}';
-      newText = '$newBefore$after';
-      offset = newBefore.length;
+      newText = '${lastOpen != -1 ? before.substring(0, lastOpen) : before}{{${opt.key}}}$after';
     } else {
       newText = opt is HeaderSuggestion ? opt.key : opt.toString();
-      offset = newText.length;
     }
     onSel(opt);
     Future.microtask(() {
-      _controller.value = TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: offset));
+      _controller.value = TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: newText.length));
       widget.onChanged(newText);
     });
   }
@@ -111,19 +108,28 @@ class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
         focusNode: _focusNode,
         optionsBuilder: _buildOptions,
         displayStringForOption: (opt) => opt is HeaderSuggestion ? opt.key : (opt is MapEntry ? opt.key : opt.toString()),
-        fieldViewBuilder: (ctx, ctrl, fn, _) => TextField(
-          controller: ctrl,
-          focusNode: fn,
-          style: widget.style,
-          decoration: widget.decoration,
-          onChanged: widget.onChanged,
+        fieldViewBuilder: (ctx, ctrl, fn, _) => Listener(
+          onPointerSignal: (e) {
+            if (e is PointerScrollEvent && _scrollController.hasClients) {
+              final d = e.scrollDelta.dy != 0 ? e.scrollDelta.dy : e.scrollDelta.dx;
+              _scrollController.jumpTo((_scrollController.offset + d).clamp(0.0, _scrollController.position.maxScrollExtent));
+            }
+          },
+          child: TextField(
+            controller: ctrl,
+            focusNode: fn,
+            scrollController: _scrollController,
+            scrollPhysics: const ClampingScrollPhysics(),
+            style: widget.style,
+            decoration: widget.decoration,
+            onChanged: widget.onChanged,
+          ),
         ),
         optionsViewBuilder: (ctx, onSel, options) => Align(
           alignment: Alignment.topLeft,
           child: Material(
             elevation: 8,
             color: const Color(0xFF1E2133),
-            clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFF2E344E))),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 240, maxWidth: 360),
@@ -131,10 +137,7 @@ class _TableFieldAutocompleteState extends State<TableFieldAutocomplete> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 shrinkWrap: true,
                 itemCount: options.length,
-                itemBuilder: (ctx, i) => TableFieldAutocompleteItem(
-                  option: options.elementAt(i),
-                  onTap: () => _selectOption(options.elementAt(i), onSel),
-                ),
+                itemBuilder: (ctx, i) => TableFieldAutocompleteItem(option: options.elementAt(i), onTap: () => _selectOption(options.elementAt(i), onSel)),
               ),
             ),
           ),
