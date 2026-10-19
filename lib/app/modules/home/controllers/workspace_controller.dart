@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 import 'package:postmanclone/app/widgets/custom_loader.dart';
-import 'package:postmanclone/app/modules/home/widgets/dialogs/app_update_dialog.dart';
 
 class WorkspaceController extends GetxController {
   final ApiService _apiService = ApiService();
@@ -458,29 +457,6 @@ class WorkspaceController extends GetxController {
     } else {
       switchWorkspace(null);
     }
-    _checkAppUpdate();
-  }
-
-  Future<void> _checkAppUpdate() async {
-    try {
-      final updateData = await _apiService.getLatestUpdate();
-      if (updateData != null && updateData['version'] != null) {
-        final serverVersion = updateData['version'].toString();
-        final prefs = await SharedPreferences.getInstance();
-        final dismissed = prefs.getString('dismissed_version');
-        if (dismissed != serverVersion) {
-          final highlights = (updateData['releaseHighlights'] as List?) ?? [];
-          final downloadUrl = updateData['landingPageUrl']?.toString() ?? 'https://jronix-post.vercel.app/#download';
-          Future.delayed(const Duration(seconds: 3), () {
-            AppUpdateDialog.show(
-              version: serverVersion,
-              highlights: highlights,
-              downloadUrl: downloadUrl,
-            );
-          });
-        }
-      }
-    } catch (_) {}
   }
 
   Future<void> fetchWorkspaces() async {

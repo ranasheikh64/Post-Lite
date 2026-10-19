@@ -21,6 +21,7 @@ import '../widgets/dialogs/rename_request_dialog.dart';
 import '../widgets/global_search_widget.dart';
 import '../widgets/top_bar_sync_button.dart';
 import '../widgets/sidebar_shimmer_loader.dart';
+import '../widgets/sidebar_workspace_selector.dart';
 
 class HomeView extends GetView<WorkspaceController> {
   HomeView({super.key});
@@ -182,114 +183,8 @@ class HomeView extends GetView<WorkspaceController> {
                       child: Column(
                         children: [
                           // Workspace Switcher
-                          Obx(
-                            () => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(color: Color(0xFF2A2D3E)),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.workspaces_outline,
-                                    size: 16,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: DropdownButtonHideUnderline(
-                                      child: DropdownButton<String?>(
-                                        isExpanded: true,
-                                        focusColor: Colors.transparent,
-                                        value: workspaceController
-                                            .selectedWorkspaceId
-                                            .value,
-                                        hint: const Text(
-                                          'Personal Workspace',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        items: [
-                                          const DropdownMenuItem<String?>(
-                                            value: null,
-                                            child: Text(
-                                              'Personal Workspace',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                          ...workspaceController.workspaces.map(
-                                            (ws) => DropdownMenuItem<String?>(
-                                              value: ws['_id'],
-                                              child: Text(
-                                                ws['name'],
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                        onChanged: (val) {
-                                          workspaceController.switchWorkspace(
-                                            val,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                  if (workspaceController
-                                              .selectedWorkspaceId
-                                              .value !=
-                                          null &&
-                                      (workspaceController
-                                                  .userRoleInWorkspace
-                                                  .value ==
-                                              'owner' ||
-                                          workspaceController
-                                                  .userRoleInWorkspace
-                                                  .value ==
-                                              'admin'))
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.settings_outlined,
-                                        size: 16,
-                                      ),
-                                      tooltip: 'Manage Team',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () => showTeamSettingsDialog(
-                                        context,
-                                        workspaceController,
-                                      ),
-                                    )
-                                  else if (workspaceController
-                                          .selectedWorkspaceId
-                                          .value ==
-                                      null)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.group_add,
-                                        size: 16,
-                                      ),
-                                      tooltip: 'Create Team',
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () => showCreateTeamDialog(
-                                        context,
-                                        workspaceController,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
+                          SidebarWorkspaceSelector(
+                            workspaceController: workspaceController,
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
