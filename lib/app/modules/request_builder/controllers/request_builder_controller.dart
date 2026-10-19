@@ -196,6 +196,7 @@ class RequestBuilderController extends GetxController {
   void onClose() {
     _autoSaveDebounceTimer?.cancel();
     _responseElapsedTimer?.cancel();
+    _cancelToken?.cancel();
     tabsScrollController.dispose();
     super.onClose();
   }
@@ -206,6 +207,13 @@ class RequestBuilderController extends GetxController {
   var isSaving = false.obs;
   Timer? _autoSaveDebounceTimer;
   Timer? _responseElapsedTimer;
+  CancelToken? _cancelToken;
+
+  void cancelRequest() {
+    _cancelToken?.cancel('Cancelled by user');
+    _responseElapsedTimer?.cancel();
+    isLoading.value = false;
+  }
 
   Future<void> _loadAutoSavePref() async {
     try {
@@ -1004,6 +1012,7 @@ class RequestBuilderController extends GetxController {
     isLoading.value = true;
     responseTime.value = 0;
     _responseElapsedTimer?.cancel();
+    _cancelToken = CancelToken();
 
     final dio = Dio();
     final stopwatch = Stopwatch()..start();
@@ -1347,7 +1356,7 @@ class RequestBuilderController extends GetxController {
           };
         }
 
-        final proxyResponse = await dio.post(proxyUrl, data: proxyData);
+        final proxyResponse = await dio.post(proxyUrl, data: proxyData, cancelToken: _cancelToken);
         statusCode = proxyResponse.data['status'] ?? 200;
         actualData = proxyResponse.data['data'];
       } else {
@@ -1356,6 +1365,7 @@ class RequestBuilderController extends GetxController {
         final response = await dio.request(
           resolvedUrl,
           data: requestBody,
+          cancelToken: _cancelToken,
           options: Options(
             method: method.value,
             headers: requestHeaders,
@@ -1387,6 +1397,9 @@ class RequestBuilderController extends GetxController {
         responseData.value = dataString;
       }
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        return;
+      }
       stopwatch.stop();
       responseTime.value = stopwatch.elapsedMilliseconds;
       responseStatus.value = e.response?.statusCode ?? 0;
@@ -1441,6 +1454,7 @@ class RequestBuilderController extends GetxController {
         isError: true,
       );
     } finally {
+      _cancelToken = null;
       _responseElapsedTimer?.cancel();
       stopwatch.stop();
       responseTime.value = stopwatch.elapsedMilliseconds;
