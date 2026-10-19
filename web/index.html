@@ -41,6 +41,15 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- Prevent browser default context menu, but allow Shift/Alt + Right Click for DevTools Inspect -->
+  <script>
+    window.addEventListener('contextmenu', function (e) {
+      if (e.shiftKey || e.altKey) {
+        return; // Allows native browser context menu (Inspect, DevTools)
+      }
+      e.preventDefault();
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

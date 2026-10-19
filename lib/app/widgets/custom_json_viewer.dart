@@ -121,6 +121,7 @@ class _CustomJsonViewerState extends State<CustomJsonViewer> {
     }
 
     return SelectionArea(
+      contextMenuBuilder: (context, selectableRegionState) => const SizedBox.shrink(),
       child: ListView.builder(
         itemCount: visibleLines.length,
         itemBuilder: (context, index) {
