@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../controllers/request_builder_controller.dart';
-import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 
 void showCodeSnippetSidePanel(BuildContext context, RequestBuilderController controller) {
   showGeneralDialog(
@@ -116,7 +115,6 @@ class _CodeSnippetSidebarState extends State<CodeSnippetSidebar> {
                 icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _generateSnippet()));
-                  CustomSnackbar.show(title: 'Copied', message: 'Code copied to clipboard');
                 },
                 splashRadius: 20,
                 tooltip: 'Copy to clipboard',

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:postmanclone/app/widgets/custom_snackbar.dart';
 import 'json_line_model.dart';
 import 'json_url_span.dart';
 import 'json_context_menu.dart';
@@ -26,7 +25,6 @@ class _JsonLineWidgetState extends State<JsonLineWidget> {
 
   void _copyValue() {
     Clipboard.setData(ClipboardData(text: widget.line.rawValue));
-    CustomSnackbar.show(title: 'Copied', message: 'Value copied to clipboard');
   }
 
   Widget _buildContent() {

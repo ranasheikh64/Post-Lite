@@ -195,6 +195,7 @@ class RequestBuilderController extends GetxController {
   @override
   void onClose() {
     _autoSaveDebounceTimer?.cancel();
+    _responseElapsedTimer?.cancel();
     tabsScrollController.dispose();
     super.onClose();
   }
@@ -204,6 +205,7 @@ class RequestBuilderController extends GetxController {
   var autoSaveEnabled = false.obs;
   var isSaving = false.obs;
   Timer? _autoSaveDebounceTimer;
+  Timer? _responseElapsedTimer;
 
   Future<void> _loadAutoSavePref() async {
     try {
@@ -223,12 +225,6 @@ class RequestBuilderController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('auto_save_tabs', autoSaveEnabled.value);
     } catch (_) {}
-    CustomSnackbar.show(
-      title: autoSaveEnabled.value ? 'Auto Save Enabled' : 'Auto Save Disabled',
-      message: autoSaveEnabled.value
-          ? 'Changes will automatically save to cloud for your team.'
-          : 'Closing unsaved tabs will prompt for confirmation.',
-    );
   }
 
   void _triggerAutoSaveDebounced() {
@@ -1006,9 +1002,16 @@ class RequestBuilderController extends GetxController {
     }
 
     isLoading.value = true;
+    responseTime.value = 0;
+    _responseElapsedTimer?.cancel();
 
     final dio = Dio();
     final stopwatch = Stopwatch()..start();
+    _responseElapsedTimer = Timer.periodic(const Duration(milliseconds: 30), (_) {
+      if (isLoading.value) {
+        responseTime.value = stopwatch.elapsedMilliseconds;
+      }
+    });
     String resolvedUrl = '';
 
     try {
@@ -1438,6 +1441,9 @@ class RequestBuilderController extends GetxController {
         isError: true,
       );
     } finally {
+      _responseElapsedTimer?.cancel();
+      stopwatch.stop();
+      responseTime.value = stopwatch.elapsedMilliseconds;
       _syncCurrentResponseToSession();
       isLoading.value = false;
     }
@@ -1470,11 +1476,6 @@ class RequestBuilderController extends GetxController {
         'time': responseTime.value,
         'size': responseSize.value,
       });
-
-      CustomSnackbar.show(
-        title: 'Success',
-        message: 'Response saved successfully',
-      );
 
       // Refresh the sidebar to show the saved response
       Get.find<WorkspaceController>().fetchCollections();

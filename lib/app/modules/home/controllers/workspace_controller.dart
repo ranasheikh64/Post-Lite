@@ -144,10 +144,6 @@ class WorkspaceController extends GetxController {
       toggleSelectionMode();
       await fetchCollections();
       CustomLoader.hide();
-      CustomSnackbar.show(
-        title: 'Success',
-        message: 'Selected items deleted successfully',
-      );
     } catch (e, stack) {
       CustomLoader.hide();
       log(
@@ -548,7 +544,6 @@ class WorkspaceController extends GetxController {
       await _apiService.deleteWorkspace(id);
       if (selectedWorkspaceId.value == id) switchWorkspace(null);
       await fetchWorkspaces();
-      CustomSnackbar.show(title: 'Success', message: 'Team deleted');
     } catch (e) {
       CustomSnackbar.show(
         title: 'Error',
@@ -620,10 +615,6 @@ class WorkspaceController extends GetxController {
         'workspace': targetWorkspaceId ?? 'null',
       });
       await fetchCollections();
-      CustomSnackbar.show(
-        title: 'Success',
-        message: 'Collection transferred successfully',
-      );
     } catch (e) {
       CustomSnackbar.show(
         title: 'Error',
@@ -664,11 +655,6 @@ class WorkspaceController extends GetxController {
     try {
       await fetchWorkspaces();
       await fetchCollections(forceLoading: true);
-      CustomSnackbar.show(
-        title: 'Synced',
-        message: 'All projects and collections updated successfully.',
-        isError: false,
-      );
     } catch (e) {
       CustomSnackbar.show(
         title: 'Sync Error',
@@ -943,7 +929,6 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.deleteCollection(id);
       removeCollectionLocally(id);
-      CustomSnackbar.show(title: 'Success', message: 'Deleted successfully');
     } catch (e, stack) {
       log(
         'Failed to delete collection',
@@ -1178,11 +1163,8 @@ class WorkspaceController extends GetxController {
           final requestIds = currentRequests.map<String>((r) => r['_id'] as String).toList();
           _apiService.reorderRequests(requestIds);
         } catch (_) {}
-
-        CustomSnackbar.show(title: 'Success', message: 'Request duplicated');
       } else {
         await fetchCollections();
-        CustomSnackbar.show(title: 'Success', message: 'Request duplicated (Reloaded tree)');
       }
     } catch (e, stack) {
       log('Failed to duplicate request', error: e, stackTrace: stack, name: 'WorkspaceController');
@@ -1226,8 +1208,6 @@ class WorkspaceController extends GetxController {
           reqBuilder.openRequests.removeWhere((req) => req['_id'] == id);
         }
       } catch (_) {}
-      
-      CustomSnackbar.show(title: 'Success', message: 'Request deleted');
     } catch (e, stack) {
       log(
         'Failed to delete request',
@@ -1247,7 +1227,6 @@ class WorkspaceController extends GetxController {
     try {
       await _apiService.deleteSavedResponse(requestId, responseId);
       await fetchCollections();
-      CustomSnackbar.show(title: 'Success', message: 'Response deleted');
     } catch (e, stack) {
       log(
         'Failed to delete response',
