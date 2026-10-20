@@ -16,6 +16,8 @@ class AuthController extends GetxController {
   final otpController = TextEditingController();
 
   final isLoading = false.obs;
+  final isForgotLoading = false.obs;
+  final isResetLoading = false.obs;
   final loginError = ''.obs;
   final currentUser = Rx<Map<String, dynamic>?>(null);
 
@@ -115,63 +117,51 @@ class AuthController extends GetxController {
   }
 
   Future<void> forgotPassword() async {
-    if (emailController.text.isEmpty) {
-      CustomSnackbar.show(
-        title: 'Error',
-        message: 'Please enter your email',
-        isError: true,
-      );
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      CustomSnackbar.show(title: 'Error', message: 'Please enter your email', isError: true);
       return;
     }
-
+    if (!GetUtils.isEmail(email)) {
+      CustomSnackbar.show(title: 'Error', message: 'Please enter a valid email', isError: true);
+      return;
+    }
     try {
-      isLoading.value = true;
-      await _authService.forgotPassword(emailController.text);
-      CustomSnackbar.show(title: 'Success', message: 'OTP sent to your email');
+      isForgotLoading.value = true;
+      await _authService.forgotPassword(email);
+      CustomSnackbar.show(title: 'OTP Sent', message: 'Check your inbox for the 6-digit code');
       Get.toNamed(Routes.RESET_PASSWORD);
     } catch (e) {
-      CustomSnackbar.show(
-        title: 'Failed',
-        message: e.toString(),
-        isError: true,
-      );
+      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
-      if (!isClosed) isLoading.value = false;
+      if (!isClosed) isForgotLoading.value = false;
     }
   }
 
   Future<void> resetPassword() async {
-    if (emailController.text.isEmpty ||
-        otpController.text.isEmpty ||
-        passwordController.text.isEmpty) {
-      CustomSnackbar.show(
-        title: 'Error',
-        message: 'Please fill all fields',
-        isError: true,
-      );
+    final otp = otpController.text.trim();
+    final pass = passwordController.text.trim();
+    if (otp.isEmpty || pass.isEmpty) {
+      CustomSnackbar.show(title: 'Error', message: 'Please fill all fields', isError: true);
       return;
     }
-
+    if (otp.length != 6 || !RegExp(r'^\d{6}$').hasMatch(otp)) {
+      CustomSnackbar.show(title: 'Error', message: 'OTP must be exactly 6 digits', isError: true);
+      return;
+    }
+    if (pass.length < 6) {
+      CustomSnackbar.show(title: 'Error', message: 'Password must be at least 6 characters', isError: true);
+      return;
+    }
     try {
-      isLoading.value = true;
-      await _authService.resetPassword(
-        emailController.text,
-        otpController.text,
-        passwordController.text,
-      );
-      CustomSnackbar.show(
-        title: 'Success',
-        message: 'Password reset successfully',
-      );
+      isResetLoading.value = true;
+      await _authService.resetPassword(emailController.text.trim(), otp, pass);
+      CustomSnackbar.show(title: 'Success', message: 'Password reset successfully');
       Get.offAllNamed(Routes.LOGIN);
     } catch (e) {
-      CustomSnackbar.show(
-        title: 'Failed',
-        message: e.toString(),
-        isError: true,
-      );
+      CustomSnackbar.show(title: 'Failed', message: e.toString(), isError: true);
     } finally {
-      if (!isClosed) isLoading.value = false;
+      if (!isClosed) isResetLoading.value = false;
     }
   }
 
